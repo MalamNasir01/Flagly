@@ -274,6 +274,16 @@ def _extract_description_b(line: str) -> Optional[str]:
     return desc[:120]
 
 
+# Fix 3: words that indicate the matched string is a budget category, not a place name
+_LOCATION_REJECT_WORDS = {
+    'MONITORING', 'EVALUATION', 'SERVICES', 'EXPENDITURE', 'RECURRENT',
+    'CAPITAL', 'PERSONNEL', 'OVERHEAD', 'REVENUE', 'SECTOR', 'BUDGET',
+    'FUND', 'GRANTS', 'LOANS', 'FINANCING', 'BORROWING', 'BONDS',
+    'DOMESTIC', 'EXTERNAL', 'INTERNATIONAL', 'TRAINING', 'RESEARCH',
+    'PURCHASE', 'CONSTRUCTION', 'REHABILITATION', 'AIDS', 'DONOR',
+}
+
+
 def _extract_location_b(line: str) -> Optional[str]:
     """Extract location code+name from Format B line, excluding financial keywords."""
     pattern = re.compile(
@@ -282,14 +292,19 @@ def _extract_location_b(line: str) -> Optional[str]:
         r'DOMESTIC|EXTERNAL|BONDS|BORROWING|FINANCING|AIDS|DONOR)[A-Z][A-Z\s]{2,30})'
     )
     m = pattern.search(line)
-    if m:
-        raw = m.group(1)
-        # Keep just the name part after the dash
-        parts = raw.split('-', 1)
-        if len(parts) > 1:
-            return parts[1].strip()
-        return raw.strip()
-    return None
+    if not m:
+        return None
+
+    raw = m.group(1)
+    parts = raw.split('-', 1)
+    name = parts[1].strip() if len(parts) > 1 else raw.strip()
+
+    # Fix 3: discard if any reject word appears in the extracted location name
+    name_words = set(name.upper().split())
+    if name_words & _LOCATION_REJECT_WORDS:
+        return None
+
+    return name if name else None
 
 
 # ─── Excel / CSV ─────────────────────────────────────────────────────────────

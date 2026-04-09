@@ -5,11 +5,32 @@ Five flag types: INFLATED_AMOUNT, CONTEXT_MISMATCH, MISSING_LOCATION,
 """
 
 import re
+import math
 from typing import List, Dict, Optional
 from rapidfuzz import fuzz
 
 
-# ─── Category benchmarks ────────────────────────────────────────────────────
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def _is_null_amount(val) -> bool:
+    """True if val is None, NaN, or Inf."""
+    if val is None:
+        return True
+    try:
+        f = float(val)
+        return math.isnan(f) or math.isinf(f)
+    except (TypeError, ValueError):
+        return True
+
+
+def _fmt_amount(val) -> str:
+    """Format amount as 'NGN X' or 'an unspecified amount' if null."""
+    if _is_null_amount(val):
+        return 'an unspecified amount'
+    return f'NGN {float(val):,.0f}'
+
+
+# ─── Category benchmarks ─────────────────────────────────────────────────────
 
 CATEGORY_BENCHMARKS = [
     (['road', 'highway', 'carriageway'], 3_000_000_000),
@@ -30,6 +51,12 @@ CATEGORY_BENCHMARKS = [
 
 FALLBACK_THRESHOLD = 1_000_000_000
 
+# Fix 4 — only flag MISSING_LOCATION for physical/deliverable project types
+PHYSICAL_PROJECT_KEYWORDS = [
+    'construction', 'rehabilitation', 'renovation', 'procurement', 'supply',
+    'establishment', 'provision', 'installation', 'repair', 'building',
+]
+
 
 def _match_category(description: str):
     """Return (keywords_label, threshold) or None if no match."""
@@ -43,13 +70,20 @@ def _match_category(description: str):
     return None
 
 
+def _has_physical_project_keyword(description: str) -> bool:
+    """True if description suggests a physical/deliverable project."""
+    desc_lower = (description or '').lower()
+    return any(kw in desc_lower for kw in PHYSICAL_PROJECT_KEYWORDS)
+
+
 # ─── Flag 1: INFLATED_AMOUNT ─────────────────────────────────────────────────
 
 def flag_inflated_amount(row: Dict) -> Optional[Dict]:
     amount = row.get('amount')
     description = row.get('description', '') or ''
-    if amount is None:
+    if _is_null_amount(amount):
         return None
+    amount = float(amount)
 
     cat = _match_category(description)
     if cat:
@@ -61,20 +95,20 @@ def flag_inflated_amount(row: Dict) -> Optional[Dict]:
                 'severity': severity,
                 'title': 'Inflated Amount',
                 'explanation': (
-                    f'Amount of NGN {amount:,.0f} exceeds typical benchmark of NGN {threshold:,.0f} '
-                    f'for {label} projects. Verify this is not split funding or inflated.'
+                    f'Amount of {_fmt_amount(amount)} exceeds typical benchmark of '
+                    f'NGN {threshold:,.0f} for {label} projects. '
+                    f'Verify this is not split funding or inflated.'
                 ),
             }
     else:
-        # No category match
         if amount > FALLBACK_THRESHOLD:
             return {
                 'flag_type': 'INFLATED_AMOUNT',
                 'severity': 'HIGH',
                 'title': 'Inflated Amount',
                 'explanation': (
-                    f'Amount of NGN {amount:,.0f} exceeds ₦1,000,000,000 with no recognised category match. '
-                    f'Verify this is not split funding or inflated.'
+                    f'Amount of {_fmt_amount(amount)} exceeds ₦1,000,000,000 with no '
+                    f'recognised category match. Verify this is not split funding or inflated.'
                 ),
             }
     return None
@@ -85,7 +119,10 @@ def flag_inflated_amount(row: Dict) -> Optional[Dict]:
 def flag_context_mismatch(row: Dict) -> Optional[Dict]:
     amount = row.get('amount')
     description = row.get('description', '') or ''
-    if amount is None or amount >= 1_000_000_000:
+    if _is_null_amount(amount):
+        return None
+    amount = float(amount)
+    if amount >= 1_000_000_000:
         return None  # INFLATED_AMOUNT handles ≥1B
 
     cat = _match_category(description)
@@ -93,15 +130,14 @@ def flag_context_mismatch(row: Dict) -> Optional[Dict]:
         return None
 
     label, threshold = cat
-    # Fire at 3x threshold but only when amount < 1B
     if amount > threshold * 3:
         return {
             'flag_type': 'CONTEXT_MISMATCH',
             'severity': 'MEDIUM',
             'title': 'Context Mismatch',
             'explanation': (
-                f'Amount is disproportionate for the item category even though it falls below the ₦1B threshold. '
-                f'NGN {amount:,.0f} for a {label} project is unusual.'
+                f'Amount is disproportionate for the item category even though it falls '
+                f'below the ₦1B threshold. {_fmt_amount(amount)} for a {label} project is unusual.'
             ),
         }
     return None
@@ -116,10 +152,16 @@ def flag_missing_location(row: Dict) -> Optional[Dict]:
     if row.get('is_mda_level'):
         return None
 
+    description = row.get('description', '') or ''
+    # Fix 4: only fire for physical/deliverable project types
+    if not _has_physical_project_keyword(description):
+        return None
+
     location = row.get('location')
     amount = row.get('amount')
-    if amount is None or amount <= 5_000_000:
+    if _is_null_amount(amount) or float(amount) <= 5_000_000:
         return None
+    amount = float(amount)
 
     loc_str = str(location).strip() if location else ''
     loc_lower = loc_str.lower()
@@ -133,8 +175,9 @@ def flag_missing_location(row: Dict) -> Optional[Dict]:
         'severity': severity,
         'title': 'Missing Location',
         'explanation': (
-            f'No state, LGA, ward or constituency is attached to this item worth NGN {amount:,.0f}. '
-            f'Without a location there is no way to verify delivery or hold anyone accountable.'
+            f'No state, LGA, ward or constituency is attached to this item worth '
+            f'{_fmt_amount(amount)}. Without a location there is no way to verify '
+            f'delivery or hold anyone accountable.'
         ),
     }
 
@@ -172,17 +215,16 @@ def flag_duplicates(rows: List[Dict]) -> List[Dict]:
         if len(cluster) >= 2:
             clusters.append(cluster)
 
-    # For each cluster, pick representative (highest amount), flag it
-    cluster_rows = set()
     for cluster in clusters:
-        sorted_cluster = sorted(
-            cluster,
-            key=lambda r: r.get('amount') or 0,
-            reverse=True,
-        )
-        representative = sorted_cluster[0]
-        cluster_row_ids = [r.get('row_id') for r in cluster]
         n = len(cluster)
+        cluster_row_ids = [r.get('row_id') for r in cluster]
+
+        # Fix 2: prefer highest non-null amount; fall back to longest description
+        members_with_amount = [r for r in cluster if not _is_null_amount(r.get('amount'))]
+        if members_with_amount:
+            representative = max(members_with_amount, key=lambda r: float(r['amount']))
+        else:
+            representative = max(cluster, key=lambda r: len(r.get('description') or ''))
 
         flag = {
             'flag_type': 'DUPLICATE_CLUSTER',
@@ -199,11 +241,11 @@ def flag_duplicates(rows: List[Dict]) -> List[Dict]:
 
         representative.setdefault('_flags', []).append(flag)
         representative['cluster_size'] = n
-        cluster_rows.add(id(representative))
 
-        # Mark non-representative members for exclusion
-        for member in sorted_cluster[1:]:
-            member['_exclude'] = True
+        # Mark all other members for exclusion
+        for member in cluster:
+            if member is not representative:
+                member['_exclude'] = True
 
     return rows
 
@@ -223,7 +265,6 @@ def flag_ghost_project(row: Dict, all_descriptions: List[str], budget_year: Opti
 
     description = row.get('description', '') or ''
     years_in_desc = [int(m) for m in YEAR_RE.findall(description)]
-
     stale_years = [y for y in years_in_desc if by - y >= 2]
     if not stale_years:
         return None
@@ -246,17 +287,15 @@ def flag_ghost_project(row: Dict, all_descriptions: List[str], budget_year: Opti
                     ),
                 }
 
-    if stale_years:
-        return {
-            'flag_type': 'GHOST_PROJECT',
-            'severity': 'MEDIUM',
-            'title': 'Ghost Project',
-            'explanation': (
-                f'This description references {min(stale_years)} — 2+ years before the {budget_year} budget. '
-                f'Verify this is not a recycled or ghost allocation.'
-            ),
-        }
-    return None
+    return {
+        'flag_type': 'GHOST_PROJECT',
+        'severity': 'MEDIUM',
+        'title': 'Ghost Project',
+        'explanation': (
+            f'This description references {min(stale_years)} — 2+ years before the '
+            f'{budget_year} budget. Verify this is not a recycled or ghost allocation.'
+        ),
+    }
 
 
 # ─── Main runner ─────────────────────────────────────────────────────────────
