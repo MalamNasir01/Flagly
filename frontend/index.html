@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UDEME Budget Red-Flag Scanner</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0f0f0f;
+  --card: #1a1a1a;
+  --card2: #222222;
+  --border: #2a2a2a;
+  --accent: #E8341C;
+  --accent-hover: #c42a17;
+  --text: #f0f0f0;
+  --muted: #888;
+  --muted2: #555;
+  --amber: #f59e0b;
+  --green: #22c55e;
+  --blue: #3b82f6;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  padding: 20px 40px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+.logo-icon {
+  width: 38px; height: 38px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 18px; color: #fff; flex-shrink: 0;
+}
+.logo-text { display: flex; flex-direction: column; }
+.logo-text .wordmark { font-size: 17px; font-weight: 800; letter-spacing: 0.12em; color: var(--text); line-height: 1; }
+.logo-text .subtext { font-size: 10px; font-weight: 600; letter-spacing: 0.15em; color: var(--muted); margin-top: 2px; }
+.header-right { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+.container { max-width: 1180px; margin: 0 auto; padding: 48px 40px; }
+
+.hero { text-align: center; margin-bottom: 48px; }
+.hero h1 { font-size: clamp(26px, 4vw, 44px); font-weight: 800; line-height: 1.15; margin-bottom: 14px; }
+.hero h1 span { color: var(--accent); }
+.hero p { font-size: 16px; color: var(--muted); max-width: 540px; margin: 0 auto; line-height: 1.65; }
+
+.upload-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+  margin-bottom: 36px;
+}
+
+.dropzone {
+  border: 2px dashed var(--muted2);
+  border-radius: 12px;
+  padding: 44px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  margin-bottom: 20px;
+}
+.dropzone:hover, .dropzone.drag-over { border-color: var(--accent); background: rgba(232,52,28,0.04); }
+.dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.dropzone-icon { font-size: 38px; margin-bottom: 10px; display: block; }
+.dropzone-label { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+.dropzone-hint { font-size: 12px; color: var(--muted); }
+
+.file-info {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(232,52,28,0.07);
+  border: 1px solid rgba(232,52,28,0.25);
+  border-radius: 8px; padding: 11px 14px; margin-top: 10px;
+}
+.file-info .file-name { font-weight: 600; font-size: 13px; color: var(--accent); }
+.file-info .file-size { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group label { font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+.form-group input {
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 13px; font-size: 13px; color: var(--text);
+  font-family: inherit; transition: border-color 0.2s; outline: none;
+}
+.form-group input:focus { border-color: var(--accent); }
+.form-group input::placeholder { color: var(--muted2); }
+
+.btn-scan {
+  width: 100%; padding: 14px 24px;
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 10px; font-size: 15px; font-weight: 700;
+  font-family: inherit; cursor: pointer; transition: background 0.2s, opacity 0.2s;
+}
+.btn-scan:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-scan:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.loading-overlay { display: none; flex-direction: column; align-items: center; gap: 14px; padding: 28px; }
+.loading-overlay.active { display: flex; }
+.spinner {
+  width: 38px; height: 38px;
+  border: 3px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; color: var(--muted); }
+
+.summary-section { display: none; margin-bottom: 36px; }
+.summary-section.visible { display: block; }
+.section-title { font-size: 11px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+
+.summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+.summary-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 18px;
+}
+.summary-card .label { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+.summary-card .value { font-size: 30px; font-weight: 800; line-height: 1; }
+.summary-card .value.red { color: var(--accent); }
+.summary-card .value.amber { color: var(--amber); }
+.summary-card .value.blue { color: var(--blue); }
+.summary-card .value.text-sm { font-size: 18px; color: var(--text); }
+.summary-card .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+.flag-pills { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 18px; }
+.pill {
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 100px; padding: 5px 13px; font-size: 11px; font-weight: 600; color: var(--muted);
+  display: flex; align-items: center; gap: 6px;
+}
+.pill .count { background: var(--accent); color: #fff; border-radius: 100px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
+.btn-pdf {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 8px; padding: 10px 18px; font-size: 13px; font-weight: 700;
+  font-family: inherit; cursor: pointer; transition: background 0.2s;
+}
+.btn-pdf:hover { background: var(--accent-hover); }
+
+.results-section { display: none; }
+.results-section.visible { display: block; }
+
+.results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+.filter-btn {
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 13px; font-size: 11px; font-weight: 600; color: var(--muted);
+  cursor: pointer; transition: all 0.15s; font-family: inherit;
+}
+.filter-btn:hover { border-color: var(--accent); color: var(--text); }
+.filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.search-box {
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 13px; font-size: 12px; color: var(--text);
+  font-family: inherit; outline: none; width: 210px; transition: border-color 0.2s;
+}
+.search-box:focus { border-color: var(--accent); }
+.search-box::placeholder { color: var(--muted2); }
+
+.table-wrapper { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+thead { background: var(--card2); border-bottom: 1px solid var(--border); }
+thead th { padding: 11px 14px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: rgba(255,255,255,0.025); }
+tbody td { padding: 12px 14px; font-size: 12px; vertical-align: middle; }
+
+.td-num { color: var(--muted); font-size: 11px; width: 36px; }
+.td-code { color: var(--muted); font-family: monospace; font-size: 10px; max-width: 70px; }
+.td-desc { font-weight: 500; max-width: 260px; }
+.td-desc span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.td-amount { font-weight: 600; white-space: nowrap; }
+.td-loc { color: var(--muted); font-size: 11px; max-width: 110px; }
+.td-loc span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.risk-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+}
+.risk-badge.HIGH { background: rgba(232,52,28,0.14); color: var(--accent); }
+.risk-badge.MEDIUM { background: rgba(245,158,11,0.14); color: var(--amber); }
+.risk-badge.LOW { background: rgba(34,197,94,0.14); color: var(--green); }
+
+.risk-bar-wrap { width: 54px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 4px; }
+.risk-bar-fill { height: 100%; border-radius: 2px; }
+
+.flag-tags { display: flex; flex-wrap: wrap; gap: 3px; }
+.flag-tag { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.04em; white-space: nowrap; }
+.flag-tag.INFLATED_AMOUNT { background: rgba(232,52,28,0.13); color: var(--accent); }
+.flag-tag.CONTEXT_MISMATCH { background: rgba(245,158,11,0.13); color: var(--amber); }
+.flag-tag.MISSING_LOCATION { background: rgba(59,130,246,0.13); color: var(--blue); }
+.flag-tag.DUPLICATE_CLUSTER { background: rgba(168,85,247,0.13); color: #a855f7; }
+.flag-tag.GHOST_PROJECT { background: rgba(236,72,153,0.13); color: #ec4899; }
+
+.pagination { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+.page-btns { display: flex; gap: 5px; }
+.page-btn {
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 600;
+  color: var(--muted); cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.page-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.page-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.toggle-low {
+  display: flex; align-items: center; gap: 7px;
+  margin-top: 10px; padding: 10px 14px; font-size: 12px; color: var(--muted);
+  cursor: pointer; background: none; border: none; font-family: inherit;
+}
+
+.error-banner {
+  display: none; background: rgba(232,52,28,0.09);
+  border: 1px solid rgba(232,52,28,0.28); border-radius: 10px;
+  padding: 12px 16px; color: var(--accent); font-size: 13px; margin-bottom: 18px;
+}
+.error-banner.visible { display: block; }
+
+/* Modal */
+.modal-bg {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+  z-index: 1000; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-bg.open { display: flex; }
+.modal {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 16px; width: 100%; max-width: 620px; max-height: 88vh;
+  overflow-y: auto; padding: 26px;
+}
+.modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; gap: 10px; }
+.modal-title { font-size: 16px; font-weight: 700; line-height: 1.4; }
+.modal-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 0; line-height: 1; flex-shrink: 0; }
+.modal-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+.meta-item .meta-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.meta-item .meta-value { font-size: 13px; font-weight: 600; }
+.modal-flags { display: flex; flex-direction: column; gap: 10px; }
+.flag-card { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 13px; }
+.flag-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.flag-card-title { font-size: 12px; font-weight: 700; }
+.flag-card-body { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+@media (max-width: 768px) {
+  .container { padding: 24px 18px; }
+  .header { padding: 14px 18px; }
+  .header-right { display: none; }
+  .summary-cards { grid-template-columns: 1fr 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  .results-header { flex-direction: column; align-items: flex-start; }
+  .search-box { width: 100%; }
+  thead th:nth-child(2), tbody td:nth-child(2) { display: none; }
+}
+@media (max-width: 480px) {
+  .summary-cards { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <a class="logo" href="#">
+    <div class="logo-icon">U</div>
+    <div class="logo-text">
+      <span class="wordmark">UDEME</span>
+      <span class="subtext">Budget Scanner</span>
+    </div>
+  </a>
+  <div class="header-right">Centre for Journalism Innovation &amp; Development · CJID</div>
+</header>
+
+<main class="container">
+
+  <div class="hero">
+    <h1>Find the <span>red flags</span><br>before the money disappears.</h1>
+    <p>Upload a Nigerian public budget file and automatically surface suspicious line items — inflated amounts, ghost projects, duplicate allocations, and missing accountability data.</p>
+  </div>
+
+  <div class="error-banner" id="errorBanner"></div>
+
+  <div class="upload-card">
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" accept=".pdf,.xlsx,.xls,.csv">
+      <span class="dropzone-icon">📂</span>
+      <div class="dropzone-label">Drop your budget file here, or click to browse</div>
+      <div class="dropzone-hint">PDF, XLSX, XLS, CSV — Federal and State budget formats supported</div>
+    </div>
+    <div class="file-info" id="fileInfo" style="display:none">
+      <span>📄</span>
+      <span class="file-name" id="fileName">—</span>
+      <span class="file-size" id="fileSize">—</span>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Budget Year <span style="color:var(--accent)">*</span></label>
+        <input type="text" id="budgetYear" placeholder="e.g. 2026" maxlength="4">
+      </div>
+      <div class="form-group">
+        <label>Ministry / Scope <span style="color:var(--muted2)">(optional)</span></label>
+        <input type="text" id="ministry" placeholder="e.g. Ministry of Works">
+      </div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loadingText">Scanning file...</div>
+    </div>
+
+    <button class="btn-scan" id="btnScan" disabled>Run Red-Flag Scan →</button>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-section" id="summarySection">
+    <div class="section-title">Scan Summary</div>
+    <div class="summary-cards">
+      <div class="summary-card">
+        <div class="label">High Risk</div>
+        <div class="value red" id="sumHigh">0</div>
+        <div class="sub">items flagged</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Medium Risk</div>
+        <div class="value amber" id="sumMedium">0</div>
+        <div class="sub">items flagged</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Flagged</div>
+        <div class="value blue" id="sumFlagged">0%</div>
+        <div class="sub" id="sumFlaggedSub">of total items</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">At-Risk Amount</div>
+        <div class="value text-sm" id="sumAtRisk">—</div>
+        <div class="sub">NGN total</div>
+      </div>
+    </div>
+
+    <div class="flag-pills">
+      <div class="pill">Duplicate Clusters <span class="count" id="pillDuplicates">0</span></div>
+      <div class="pill">Inflated Amounts <span class="count" id="pillInflated">0</span></div>
+      <div class="pill">Context Mismatch <span class="count" id="pillContext">0</span></div>
+      <div class="pill">No Location <span class="count" id="pillLocation">0</span></div>
+      <div class="pill">Ghost Projects <span class="count" id="pillGhost">0</span></div>
+    </div>
+
+    <button class="btn-pdf" onclick="downloadPDF()">⬇ Download PDF Report</button>
+  </div>
+
+  <!-- Results -->
+  <div class="results-section" id="resultsSection">
+    <div class="results-header">
+      <div class="section-title" style="margin-bottom:0">Flagged Line Items</div>
+      <input class="search-box" id="searchBox" type="text" placeholder="Search description...">
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-btn" data-filter="all" onclick="setFilter('all')">All</button>
+      <button class="filter-btn active" data-filter="HIGH" onclick="setFilter('HIGH')">High Risk</button>
+      <button class="filter-btn" data-filter="MEDIUM" onclick="setFilter('MEDIUM')">Medium Risk</button>
+      <button class="filter-btn" data-filter="DUPLICATE_CLUSTER" onclick="setFilter('DUPLICATE_CLUSTER')">Duplicate Clusters</button>
+      <button class="filter-btn" data-filter="INFLATED_AMOUNT" onclick="setFilter('INFLATED_AMOUNT')">Inflated Amounts</button>
+      <button class="filter-btn" data-filter="CONTEXT_MISMATCH" onclick="setFilter('CONTEXT_MISMATCH')">Context Mismatch</button>
+      <button class="filter-btn" data-filter="MISSING_LOCATION" onclick="setFilter('MISSING_LOCATION')">No Location</button>
+      <button class="filter-btn" data-filter="GHOST_PROJECT" onclick="setFilter('GHOST_PROJECT')">Ghost Projects</button>
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th class="td-num">#</th>
+            <th class="td-code">CODE</th>
+            <th>DESCRIPTION</th>
+            <th>AMOUNT (NGN)</th>
+            <th>LOCATION</th>
+            <th>RISK SCORE</th>
+            <th>FLAGS</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="pagination" id="paginationBar">
+        <div id="pageInfo">—</div>
+        <div class="page-btns" id="pageBtns"></div>
+      </div>
+    </div>
+
+    <button class="toggle-low" id="toggleLow" onclick="toggleLowRisk()">
+      👁 Show low-risk items
+    </button>
+  </div>
+
+</main>
+
+<!-- Modal -->
+<div class="modal-bg" id="modalBg" onclick="closeModalBg(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">—</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-meta" id="modalMeta"></div>
+    <div class="modal-flags" id="modalFlags"></div>
+  </div>
+</div>
+
+<script>
+const PAGE_SIZE = 25;
+let scanData = null;
+let allResults = [];
+let filteredResults = [];
+let currentFilter = 'HIGH';
+let currentSearch = '';
+let currentPage = 1;
+let showLowRisk = false;
+let selectedFile = null;
+
+// ── File handling ──────────────────────────────────────────────────────────
+const fileInput = document.getElementById('fileInput');
+const dropzone  = document.getElementById('dropzone');
+
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) selectFile(fileInput.files[0]); });
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault(); dropzone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]);
+});
+
+function selectFile(f) {
+  selectedFile = f;
+  document.getElementById('fileName').textContent = f.name;
+  document.getElementById('fileSize').textContent = fmtBytes(f.size);
+  document.getElementById('fileInfo').style.display = 'flex';
+  updateBtn();
+}
+
+function fmtBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+document.getElementById('budgetYear').addEventListener('input', updateBtn);
+
+function updateBtn() {
+  const yr = document.getElementById('budgetYear').value.trim();
+  document.getElementById('btnScan').disabled = !(selectedFile && /^\d{4}$/.test(yr));
+}
+
+// ── Scan ──────────────────────────────────────────────────────────────────
+document.getElementById('btnScan').addEventListener('click', runScan);
+
+async function runScan() {
+  if (!selectedFile) return;
+  const yr  = document.getElementById('budgetYear').value.trim();
+  const min = document.getElementById('ministry').value.trim();
+
+  hideError();
+  setLoading(true);
+  hideResults();
+
+  const form = new FormData();
+  form.append('file', selectedFile);
+  form.append('budget_year', yr);
+  if (min) form.append('ministry', min);
+  document.getElementById('loadingText').textContent = `Scanning ${selectedFile.name}…`;
+
+  try {
+    const res  = await fetch('/scan', { method: 'POST', body: form });
+    const data = await res.json();
+    setLoading(false);
+    if (data.error) { showError(data.error); return; }
+    scanData = data;
+    allResults = data.results || [];
+    renderSummary(data);
+    currentPage = 1;
+    applyFilters();
+    showResults();
+  } catch (err) {
+    setLoading(false);
+    showError('Network error: ' + err.message);
+  }
+}
+
+function setLoading(on) {
+  document.getElementById('loadingOverlay').classList.toggle('active', on);
+  document.getElementById('btnScan').style.display = on ? 'none' : 'block';
+}
+
+function hideResults() {
+  document.getElementById('summarySection').classList.remove('visible');
+  document.getElementById('resultsSection').classList.remove('visible');
+}
+
+function showResults() {
+  document.getElementById('summarySection').classList.add('visible');
+  document.getElementById('resultsSection').classList.add('visible');
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBanner');
+  el.textContent = '⚠ ' + msg;
+  el.classList.add('visible');
+}
+
+function hideError() { document.getElementById('errorBanner').classList.remove('visible'); }
+
+// ── Summary ───────────────────────────────────────────────────────────────
+function renderSummary(d) {
+  document.getElementById('sumHigh').textContent   = d.high_risk   || 0;
+  document.getElementById('sumMedium').textContent = d.medium_risk || 0;
+  const pct = d.total_items ? Math.round((d.flagged_items / d.total_items) * 100) : 0;
+  document.getElementById('sumFlagged').textContent    = pct + '%';
+  document.getElementById('sumFlaggedSub').textContent = `${d.flagged_items} of ${d.total_items} items`;
+  document.getElementById('sumAtRisk').textContent     = fmtNGN(d.at_risk_amount);
+  const fs = d.flag_summary || {};
+  document.getElementById('pillDuplicates').textContent = fs.duplicate_clusters || 0;
+  document.getElementById('pillInflated').textContent   = fs.inflated_amounts   || 0;
+  document.getElementById('pillContext').textContent    = fs.context_mismatch   || 0;
+  document.getElementById('pillLocation').textContent   = fs.missing_location   || 0;
+  document.getElementById('pillGhost').textContent      = fs.ghost_projects     || 0;
+}
+
+function fmtNGN(v) {
+  if (!v && v !== 0) return '—';
+  if (v >= 1e9) return '₦' + (v/1e9).toFixed(2) + 'B';
+  if (v >= 1e6) return '₦' + (v/1e6).toFixed(1) + 'M';
+  return '₦' + Math.round(v).toLocaleString();
+}
+
+function fmtNGNFull(v) {
+  if (!v && v !== 0) return '—';
+  return '₦' + Math.round(v).toLocaleString();
+}
+
+// ── Filters ───────────────────────────────────────────────────────────────
+function setFilter(f) {
+  currentFilter = f; currentPage = 1;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === f));
+  applyFilters();
+}
+
+document.getElementById('searchBox').addEventListener('input', e => {
+  currentSearch = e.target.value.trim().toLowerCase();
+  currentPage = 1;
+  applyFilters();
+});
+
+function applyFilters() {
+  let items = allResults;
+  if (!showLowRisk) items = items.filter(r => r.risk_level !== 'LOW');
+  if      (currentFilter === 'HIGH')   items = items.filter(r => r.risk_level === 'HIGH');
+  else if (currentFilter === 'MEDIUM') items = items.filter(r => r.risk_level === 'MEDIUM');
+  else if (currentFilter !== 'all')    items = items.filter(r => (r.flags||[]).some(f => f.flag_type === currentFilter));
+  if (currentSearch) items = items.filter(r => (r.description||'').toLowerCase().includes(currentSearch));
+  filteredResults = items;
+  renderTable();
+}
+
+// ── Table ─────────────────────────────────────────────────────────────────
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page  = filteredResults.slice(start, start + PAGE_SIZE);
+
+  if (!filteredResults.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--muted)">No items match this filter.</td></tr>`;
+    renderPagination(0); return;
+  }
+
+  tbody.innerHTML = page.map((r, i) => {
+    const idx  = start + i + 1;
+    const lvl  = r.risk_level || 'LOW';
+    const sc   = r.risk_score || 0;
+    const col  = lvl==='HIGH' ? 'var(--accent)' : lvl==='MEDIUM' ? 'var(--amber)' : 'var(--green)';
+    const tags = buildTags(r.flags||[]);
+    return `<tr onclick="openModal(${i + start})">
+      <td class="td-num">${idx}</td>
+      <td class="td-code">${esc(r.project_code||'—')}</td>
+      <td class="td-desc"><span title="${esc(r.description||'')}">${esc(r.description||'—')}</span></td>
+      <td class="td-amount">${fmtNGN(r.amount)}</td>
+      <td class="td-loc"><span title="${esc(r.location||'')}">${esc(r.location||'—')}</span></td>
+      <td>
+        <span class="risk-badge ${lvl}">${lvl} ${sc}</span>
+        <div class="risk-bar-wrap"><div class="risk-bar-fill" style="width:${sc}%;background:${col}"></div></div>
+      </td>
+      <td><div class="flag-tags">${tags}</div></td>
+    </tr>`;
+  }).join('');
+
+  renderPagination(filteredResults.length);
+}
+
+function buildTags(flags) {
+  return flags.map(f => {
+    let label = f.flag_type;
+    if (f.flag_type==='DUPLICATE_CLUSTER') label = `DUPLICATE (${f.cluster_size}x)`;
+    else if (f.flag_type==='INFLATED_AMOUNT') label = 'INFLATED';
+    else if (f.flag_type==='CONTEXT_MISMATCH') label = 'MISMATCH';
+    else if (f.flag_type==='MISSING_LOCATION') label = 'NO LOCATION';
+    else if (f.flag_type==='GHOST_PROJECT') label = 'GHOST';
+    return `<span class="flag-tag ${f.flag_type}">${label}</span>`;
+  }).join('');
+}
+
+function renderPagination(total) {
+  const pages = Math.ceil(total / PAGE_SIZE);
+  const s = (currentPage-1)*PAGE_SIZE;
+  document.getElementById('pageInfo').textContent =
+    total ? `${s+1}–${Math.min(s+PAGE_SIZE,total)} of ${total}` : 'No results';
+
+  const btns = document.getElementById('pageBtns');
+  if (pages <= 1) { btns.innerHTML = ''; return; }
+  let h = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+  for (let p=1; p<=pages; p++) {
+    if (pages > 7 && Math.abs(p-currentPage) > 2 && p !== 1 && p !== pages) {
+      if (p===2||p===pages-1) h += `<span style="padding:4px 2px;color:var(--muted)">…</span>`;
+      continue;
+    }
+    h += `<button class="page-btn${p===currentPage?' active':''}" onclick="goPage(${p})">${p}</button>`;
+  }
+  h += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===pages?'disabled':''}>›</button>`;
+  btns.innerHTML = h;
+}
+
+function goPage(p) {
+  currentPage = p; renderTable();
+  document.getElementById('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function toggleLowRisk() {
+  showLowRisk = !showLowRisk;
+  document.getElementById('toggleLow').textContent = showLowRisk ? '👁 Hide low-risk items' : '👁 Show low-risk items';
+  currentPage = 1; applyFilters();
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────
+function openModal(idx) {
+  const r = filteredResults[idx];
+  if (!r) return;
+  document.getElementById('modalTitle').textContent = r.description || '—';
+  document.getElementById('modalMeta').innerHTML = `
+    <div class="meta-item"><div class="meta-label">Amount</div><div class="meta-value">${fmtNGNFull(r.amount)}</div></div>
+    <div class="meta-item"><div class="meta-label">Location</div><div class="meta-value">${esc(r.location||'—')}</div></div>
+    <div class="meta-item"><div class="meta-label">Ministry / MDA</div><div class="meta-value">${esc(r.ministry||'—')}</div></div>
+    <div class="meta-item"><div class="meta-label">Risk Level</div><div class="meta-value"><span class="risk-badge ${r.risk_level}">${r.risk_level} (${r.risk_score})</span></div></div>
+  `;
+  document.getElementById('modalFlags').innerHTML = (r.flags||[]).map(f => `
+    <div class="flag-card">
+      <div class="flag-card-header">
+        <span class="flag-tag ${f.flag_type}">${f.flag_type.replace(/_/g,' ')}</span>
+        <span class="flag-card-title">${esc(f.title||'')}</span>
+        <span class="risk-badge ${f.severity}" style="margin-left:auto">${f.severity}</span>
+      </div>
+      <div class="flag-card-body">${esc(f.explanation||'')}</div>
+    </div>
+  `).join('');
+  document.getElementById('modalBg').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modalBg').classList.remove('open'); }
+function closeModalBg(e) { if (e.target===document.getElementById('modalBg')) closeModal(); }
+document.addEventListener('keydown', e => { if (e.key==='Escape') closeModal(); });
+
+function esc(s) {
+  return String(s||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── PDF Report ────────────────────────────────────────────────────────────
+function downloadPDF() {
+  if (!scanData || !window.jspdf) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const W=210, H=297, M=18, CW=W-M*2;
+
+  function footer(n) {
+    doc.setFontSize(7.5); doc.setTextColor(110,110,110);
+    doc.text('UDEME — Social Accountability Platform | CJID | cjid.net | Page '+n, W/2, H-7, {align:'center'});
+  }
+
+  function tr(s,max) { return (!s||s==='undefined') ? '—' : s.length>max ? s.slice(0,max-1)+'…' : s; }
+
+  function fmtP(v) {
+    if (!v&&v!==0) return '—';
+    if (v>=1e9) return 'NGN '+(v/1e9).toFixed(2)+'B';
+    if (v>=1e6) return 'NGN '+(v/1e6).toFixed(1)+'M';
+    return 'NGN '+Math.round(v).toLocaleString();
+  }
+
+  let pn = 1;
+
+  // Page 1: Cover
+  doc.setFillColor(15,15,15); doc.rect(0,0,W,H,'F');
+  doc.setFillColor(232,52,28); doc.rect(0,0,W,10,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(20); doc.setFont('helvetica','bold');
+  doc.text('UDEME Budget Red-Flag Scan Report', W/2, 55, {align:'center'});
+  doc.setFontSize(11); doc.setFont('helvetica','normal'); doc.setTextColor(160,160,160);
+  doc.text('Centre for Journalism Innovation & Development', W/2, 65, {align:'center'});
+
+  doc.setFillColor(28,28,28); doc.roundedRect(M, 80, CW, 85, 4, 4, 'F');
+  const yr = document.getElementById('budgetYear').value || '—';
+  const lines2 = [
+    ['File', tr(selectedFile?.name||'—', 52)],
+    ['Budget Year', yr],
+    ['Scan Date', new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'})],
+    ['Total Items Scanned', (scanData.total_items||0).toLocaleString()],
+    ['Items Flagged', (scanData.flagged_items||0).toLocaleString()],
+    ['High Risk', (scanData.high_risk||0).toLocaleString()],
+    ['Medium Risk', (scanData.medium_risk||0).toLocaleString()],
+    ['Total At-Risk', fmtP(scanData.at_risk_amount)],
+  ];
+  let ry = 92;
+  lines2.forEach(([lbl,val]) => {
+    doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(130,130,130);
+    doc.text(lbl+':', M+8, ry);
+    doc.setFont('helvetica','normal'); doc.setTextColor(230,230,230);
+    doc.text(String(val), M+68, ry);
+    ry += 8;
+  });
+  footer(pn);
+
+  // Page 2: Flag Summary
+  doc.addPage(); pn++;
+  doc.setFillColor(15,15,15); doc.rect(0,0,W,H,'F');
+  doc.setFillColor(232,52,28); doc.rect(0,0,W,4,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(14); doc.setFont('helvetica','bold');
+  doc.text('Flag Summary', M, 20);
+
+  const fs = scanData.flag_summary||{};
+  const fRows = [
+    ['Duplicate Clusters', fs.duplicate_clusters||0],
+    ['Inflated Amounts',   fs.inflated_amounts  ||0],
+    ['Context Mismatch',  fs.context_mismatch  ||0],
+    ['Missing Location',  fs.missing_location  ||0],
+    ['Ghost Projects',    fs.ghost_projects    ||0],
+  ];
+  let fy = 30;
+  fRows.forEach(([lbl,cnt]) => {
+    doc.setFillColor(28,28,28); doc.rect(M,fy,CW,8,'F');
+    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(200,200,200);
+    doc.text(lbl, M+4, fy+5.5);
+    doc.setFont('helvetica','bold'); doc.setTextColor(232,52,28);
+    doc.text(String(cnt), M+CW-4, fy+5.5, {align:'right'});
+    fy += 10;
+  });
+
+  doc.setFontSize(12); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+  doc.text('Top 10 Most Suspicious Items', M, fy+10);
+  fy += 18;
+  const top10 = [...allResults].sort((a,b)=>(b.risk_score||0)-(a.risk_score||0)).slice(0,10);
+  top10.forEach((r,i) => {
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(190,190,190);
+    doc.text(`${i+1}. ${tr(r.description,52)} | ${fmtP(r.amount)} | ${tr(r.location||'—',22)} | Score: ${r.risk_score}`, M, fy);
+    fy += 7;
+  });
+  footer(pn);
+
+  // Pages 3–9: Findings per category
+  const cats = [
+    {key:'DUPLICATE_CLUSTER', label:'Duplicate Clusters'},
+    {key:'INFLATED_AMOUNT',   label:'Inflated Amounts'},
+    {key:'CONTEXT_MISMATCH',  label:'Context Mismatch'},
+    {key:'MISSING_LOCATION',  label:'Missing Location'},
+    {key:'GHOST_PROJECT',     label:'Ghost Projects'},
+  ];
+
+  cats.forEach(cat => {
+    if (pn >= 9) return;
+    const items = allResults.filter(r=>(r.flags||[]).some(f=>f.flag_type===cat.key)).slice(0,5);
+    if (!items.length) return;
+    doc.addPage(); pn++;
+    doc.setFillColor(15,15,15); doc.rect(0,0,W,H,'F');
+    doc.setFillColor(232,52,28); doc.rect(0,0,W,4,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
+    doc.text(cat.label, M, 18);
+    let cy = 28;
+    items.forEach(r => {
+      const flag = (r.flags||[]).find(f=>f.flag_type===cat.key);
+      doc.setFillColor(26,26,26); doc.roundedRect(M,cy,CW,28,3,3,'F');
+      doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(235,235,235);
+      doc.text(tr(r.description,62), M+4, cy+8);
+      doc.setFont('helvetica','normal'); doc.setTextColor(170,170,170);
+      doc.text(`Amount: ${fmtP(r.amount)}  |  Location: ${tr(r.location||'—',26)}`, M+4, cy+15);
+      const rc = r.risk_level==='HIGH' ? [232,52,28] : r.risk_level==='MEDIUM' ? [245,158,11] : [34,197,94];
+      doc.setTextColor(...rc); doc.setFont('helvetica','bold'); doc.setFontSize(8);
+      doc.text(r.risk_level+' ('+r.risk_score+')', M+CW-4, cy+8, {align:'right'});
+      if (flag) {
+        doc.setFont('helvetica','normal'); doc.setTextColor(140,140,140); doc.setFontSize(7.5);
+        const expl = cat.key==='DUPLICATE_CLUSTER' ? `Appears ${flag.cluster_size||'?'} times in budget` : tr(flag.explanation,95);
+        doc.text(expl, M+4, cy+22);
+      }
+      cy += 33;
+    });
+    footer(pn);
+  });
+
+  // Page 10: Methodology
+  doc.addPage(); pn++;
+  doc.setFillColor(15,15,15); doc.rect(0,0,W,H,'F');
+  doc.setFillColor(232,52,28); doc.rect(0,0,W,4,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
+  doc.text('Methodology', M, 18);
+  const methods = [
+    {t:'Inflated Amount', b:'Compares each line item against category-specific cost benchmarks for Nigerian infrastructure. Items exceeding the benchmark are flagged. Recommended action: Cross-reference with BOQ and market rates for the project type.'},
+    {t:'Context Mismatch', b:'Flags items where the amount is grossly disproportionate for the category even though it falls below ₦1B. Recommended action: Request an itemised breakdown and supporting documents.'},
+    {t:'Missing Location', b:'Flags capital expenditure above ₦5M with no attached LGA, ward, or constituency. Without a location, physical verification is impossible. Recommended action: File an FOI request for implementation details.'},
+    {t:'Duplicate Cluster', b:'Groups budget lines with ≥95% description similarity. Recommended action: Verify each listed project is at a distinct location with unique beneficiaries.'},
+    {t:'Ghost Project', b:'Detects descriptions referencing years 2+ years before the current budget, indicating potentially recycled or unimplemented projects. Recommended action: File a performance audit request.'},
+  ];
+  let my = 28;
+  methods.forEach(m => {
+    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(232,52,28);
+    doc.text(m.t, M, my); my += 5;
+    doc.setFont('helvetica','normal'); doc.setTextColor(195,195,195); doc.setFontSize(8);
+    const ls = doc.splitTextToSize(m.b, CW);
+    doc.text(ls, M, my); my += ls.length*4.8 + 6;
+  });
+  footer(pn);
+
+  doc.save(`UDEME-Scan-${yr}.pdf`);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+fastapi==0.111.0
+uvicorn==0.29.0
+python-multipart==0.0.9
+pandas==2.2.2
+openpyxl==3.1.2
+pdfplumber==0.11.0
+rapidfuzz==3.9.0
+spacy==3.7.4
+scipy==1.13.0
+numpy==1.26.4
+requests==2.31.0
+aiofiles==23.2.1

@@ -1,0 +1,222 @@
+Build the UDEME Budget Red-Flag Scanner — a web tool for accountability journalists at the Centre for Journalism Innovation & Development (CJID) that automatically detects suspicious items in Nigerian public budget files.
+
+STACK
+
+Backend: Python 3.11, FastAPI, uvicorn
+Frontend: Single index.html file with vanilla JS and CSS — no frameworks
+PDF parsing: pdfplumber + pdftotext -layout (poppler) as fallback
+Fuzzy matching: rapidfuzz
+Data processing: pandas
+PDF report generation: jsPDF (client-side, loaded from cdnjs.cloudflare.com)
+No database — everything is stateless and processed in memory
+No external API calls — all processing happens on the server, no data leaves
+
+
+PROJECT STRUCTURE
+udeme-scanner/
+├── main.py                  # FastAPI app entry point
+├── requirements.txt
+├── engines/
+│   ├── parser.py            # PDF/Excel/CSV parsing engine
+│   ├── flags.py             # Red-flag detection engine
+│   └── scorer.py            # Risk scoring engine
+└── frontend/
+    └── index.html           # Complete single-file frontend
+
+BACKEND — main.py
+Create a FastAPI app with these endpoints:
+POST /scan
+
+Accepts multipart file upload (PDF, XLSX, XLS, CSV) + form fields: budget_year (string), ministry (string, optional)
+Calls parser.py → flags.py → scorer.py in sequence
+Returns JSON: { total_items, flagged_items, high_risk, medium_risk, low_risk, at_risk_amount, total_amount, flag_summary, results }
+flag_summary is a dict: { duplicate_clusters, inflated_amounts, context_mismatch, missing_location, ghost_projects }
+results is array of flagged items only (not all items)
+Handle errors gracefully — return { error: "message" } with HTTP 400 for parse failures
+
+GET /health
+
+Returns { status: "ok" }
+
+Use uvicorn main:app --host 0.0.0.0 --port 8000 to run. Read port from os.environ.get("PORT", 8000) for hosting compatibility.
+
+BACKEND — engines/parser.py
+The parser must handle two real-world Nigerian budget PDF formats plus Excel and CSV. It returns a pandas DataFrame with columns: description, amount, location, ministry, project_code, is_mda_level.
+Format Detection
+After opening a PDF with pdfplumber, scan the first 20 pages for the location code pattern \d{8,11}\s*-\s*[A-Z]{2,}. If at least 3 matches are found on any single page → Format B. Otherwise → Format A.
+Format A — Federal Appropriation Bill (MDA-level)
+Structure: NO | CODE | MDA | PERSONNEL | OVERHEAD | CAPITAL | RETAINED INDEPENDENT REVENUE | AID & GRANT FUNDED | TOTAL ALLOCATION
+
+Use pdfplumber to extract tables. If any(len(t) > 1 for t in tables) is False (header-only extraction due to missing borders), fall through to pdftotext -layout fallback
+Extract TOTAL ALLOCATION as the amount column
+Extract MDA name as description
+Set is_mda_level = True for all rows
+Set location = ministry = MDA name
+Skip rows where the first token is not a number
+Strip commas from numbers before casting to float
+
+Format B — State Government project-level (e.g. Niger State)
+Structure: PROJECT DESCRIPTION | PROGRAMME CODE | MDA CODE+NAME | ECONOMIC CODE | FUNCTION CODE | LOCATION CODE+NAME | amounts...
+
+Use pdftotext -layout to extract text, writing PDF bytes to a temp file
+Only start processing pages once a page contains at least 3 lines matching ALL THREE conditions simultaneously: (a) location regex match, (b) amount pattern [\d,]+\.00, (c) description 15+ chars not starting with a digit
+Once triggered, in_project_section = True — never reset to False
+Sanity check: if more than 500 rows collected but fewer than 5% have a valid location, reset data = [] and in_project_section = False and keep scanning
+For each line extract:
+
+Location: regex (\d{8,11}\s*-\s*(?!CAPITAL|GRANTS|RECURRENT|REVENUE|EXPENDITURE|PERSONNEL|OVERHEAD|PURCHASE|CONSTRUCTION|REHABILITATION|TRAINING|RESEARCH|INTERNATIONAL|LOANS|DOMESTIC|EXTERNAL|BONDS|BORROWING|FINANCING|AIDS|DONOR)[A-Z][A-Z\s]{2,30}) on the full line
+Amount: first match of [\d,]+\.\d{2} on the line (first = 2026 budget column)
+Description: everything left of the first MDA code pattern \d{12,14}\s*-, stripped of leading numeric codes matching ^\d{10,14}\s*-\s*
+
+
+Skip lines where: blank, starts with function code ^\s*70\d{2,3}, description contains any numeric pattern, description longer than 120 chars, description starts with "Total" or "Sub-Total"
+Map STATE WIDE location → "State Wide", do not flag as missing location
+Set is_mda_level = False
+
+Excel/CSV parsing
+
+Use pandas read_excel or read_csv
+Auto-detect columns using keyword matching:
+
+Amount keywords: ["amount", "total", "allocation", "approved budget", "total allocation", "capital", "overhead"]
+Description keywords: ["description", "project", "item", "activity", "mda", "administrative unit"]
+Location keywords: ["location", "state", "lga", "constituency", "ward", "zone"]
+
+
+Take the first matching column for each category
+Strip commas from amount values, cast to float
+
+Post-processing (all formats)
+
+Drop rows where description is null or less than 5 characters
+Replace all NaN with None: df = df.where(pd.notnull(df), None)
+Assign sequential row_id starting from 1
+
+
+BACKEND — engines/flags.py
+Run five flag checks. Return a list of flag objects per item: { flag_type, severity, title, explanation }.
+Flag 1 — INFLATED AMOUNT
+Compare amount against these category benchmarks. Detect category by keyword matching on description:
+Category keywordsFlag thresholdroad, highway, carriageway₦3,000,000,000bridge₦3,000,000,000school, classroom₦600,000,000hospital, health centre₦3,000,000,000clinic, primary health₦600,000,000borehole, water supply₦60,000,000toilet, sanitation₦30,000,000renovation, remodel₦300,000,000furniture₦150,000,000vehicle, equipment₦150,000,000training, capacity₦60,000,000printing, publication₦30,000,000consultancy, study₦300,000,000empowerment, grant₦300,000,000
+
+If no category matched but amount > ₦1,000,000,000 → still flag as INFLATED AMOUNT
+Severity: HIGH if amount > ₦1B, MEDIUM otherwise
+Explanation: "Amount of NGN X exceeds typical benchmark of NGN Y for [category] projects. Verify this is not split funding or inflated."
+
+Flag 2 — CONTEXT MISMATCH
+
+Same category benchmarks as above but flag at 3x the typical HIGH end, not the threshold
+Only fires when amount is UNDER ₦1B (otherwise INFLATED AMOUNT fires instead)
+Example: furniture purchase at ₦800M is under ₦1B but grossly disproportionate
+Severity: MEDIUM
+Explanation: "Amount is disproportionate for the item category even though it falls below the ₦1B threshold."
+
+Flag 3 — MISSING LOCATION
+
+Skip entirely if is_mda_level = True
+Skip if location contains a valid place name (non-null, length > 3, not "STATE WIDE", not "VARIOUS", not "NATIONAL")
+Only fire if amount > ₦5,000,000 AND location is null or empty
+Severity: HIGH if amount > ₦100M, MEDIUM if amount > ₦5M
+Explanation: "No state, LGA, ward or constituency is attached to this item worth NGN X. Without a location there is no way to verify delivery or hold anyone accountable."
+
+Flag 4 — DUPLICATE CLUSTER (most important — implement carefully)
+This replaces individual duplicate flagging with cluster-based detection:
+
+Group all rows where description similarity ≥ 95% (using rapidfuzz.fuzz.ratio) into clusters
+A cluster must have at least 2 members to be reported
+Only compare rows where description is longer than 20 characters AND does not start with a digit
+Report each cluster ONCE — pick the row with the highest amount as the "representative" row
+Flag object: { flag_type: "DUPLICATE_CLUSTER", cluster_size: N, matched_rows: [list of row_ids], severity: "HIGH" if cluster_size > 5 else "MEDIUM" }
+Explanation: "This project description appears [N] times across the budget. Verify these are genuinely separate projects at different locations and not the same allocation duplicated."
+In the final results, only include the representative row, not every member of the cluster
+Add a cluster_size field to the result item
+
+Flag 5 — GHOST PROJECT
+
+Requires budget_year to be provided
+Check if the same description (95%+ match) appears in items where the description contains a year that is 2+ years earlier than budget_year
+Only applicable when scanning multi-year data — skip silently if insufficient data
+
+
+BACKEND — engines/scorer.py
+Assign a numeric risk score 0–100 and risk level HIGH/MEDIUM/LOW to each flagged item:
+
+Start at 0
++40 if any flag is severity HIGH
++20 if any flag is severity MEDIUM
++15 for each additional flag type beyond the first (max +30)
++10 if amount > ₦1B
++5 if location is missing
+Cap at 100
+Risk level: HIGH if score ≥ 70, MEDIUM if score ≥ 40, LOW if score < 40
+Items with only LOW-severity flags and score < 40 are excluded from results entirely
+
+
+FRONTEND — frontend/index.html
+Single HTML file. Dark theme. UDEME branding. Clean, professional, journalist-focused.
+Design
+
+Background: #0f0f0f, Cards: #1a1a1a, Accent red: #E8341C
+Font: Inter from Google Fonts
+Mobile responsive
+
+Layout — 3 sections:
+Section 1 — Upload
+
+UDEME logo (U icon + "UDEME" wordmark + "BUDGET SCANNER" subtext) top left
+Hero text: "Find the red flags before the money disappears."
+File drop zone accepting PDF, XLSX, XLS, CSV — shows filename + size on selection
+Two input fields: BUDGET YEAR (required) and MINISTRY/SCOPE (optional)
+"Run Red-Flag Scan →" button in red — disabled until file selected
+Loading state with spinner and "Scanning [filename]..." text while API call is in progress
+
+Section 2 — Scan Summary (hidden until scan completes)
+
+4 summary cards: HIGH RISK (count), MEDIUM RISK (count), FLAGGED (percentage of total), AT-RISK AMOUNT (NGN formatted)
+Below cards: 5 flag type pills showing counts — Duplicate Clusters | Inflated Amounts | Context Mismatch | No Location | Ghost Projects
+"Download PDF Report" button — red, appears after scan
+
+Section 3 — Flagged Line Items table (hidden until scan completes)
+
+Filter buttons: All | High risk | Medium risk | Duplicate clusters | Inflated amounts | Context mismatch | No location | Ghost projects
+Default active filter: High risk (not All)
+Search box: filters by description keyword
+Table columns: # | CODE | DESCRIPTION | AMOUNT (NGN) | LOCATION | RISK SCORE | FLAGS
+Risk score shown as badge (red=HIGH, amber=MEDIUM, green=LOW) + progress bar coloured accordingly
+FLAGS column: show condensed tags — for duplicates show "DUPLICATE CLUSTER (Nx)" not individual tags
+Clicking any row opens a detail modal showing full description, all flag explanations, and full location
+Pagination: 25 rows per page
+LOW risk items hidden by default — "Show low risk items" toggle at bottom
+
+PDF Report Generation (jsPDF, client-side)
+Load jsPDF from https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js
+When "Download PDF Report" clicked, generate a maximum 10-page report:
+
+Page 1 — Cover: Title "UDEME Budget Red-Flag Scan Report", filename, budget year, scan date, summary box (total scanned, flagged, HIGH/MEDIUM/LOW counts, total at-risk NGN)
+Page 2 — Flag Summary: Table of flag type counts + "Top 10 Most Suspicious Items" — one line each showing description (max 60 chars), amount, location, risk score
+Pages 3–9 — Findings: Max 5 items per flag category. Each item: description (60 chars max), amount, location, risk badge, ONE sentence explanation. For duplicate clusters show "Appears X times in budget" — never list individual row numbers
+Page 10 — Methodology: Plain English explanation of each flag type and what action is recommended
+Footer every page: "UDEME — Social Accountability Platform | CJID | cjid.net | Page X"
+
+
+REQUIREMENTS.TXT
+fastapi
+uvicorn
+pdfplumber
+pandas
+rapidfuzz
+openpyxl
+xlrd
+python-multipart
+
+IMPORTANT CONSTRAINTS
+
+No data storage — never write budget data to disk permanently or send to any external service
+No automated scraping — user always manually uploads
+poppler-utils must be available for pdftotext -layout — add to replit.nix or system packages if on Replit
+CORS — enable allow_origins=["*"] on the FastAPI app for local file:// access
+Error handling — every parser function must catch exceptions and return empty DataFrame rather than crashing. The API must always return a valid JSON response
+Performance — the Niger State 2026 budget PDF is 399 pages / 2.5MB. The Federal Appropriation Bill is 2790 pages / 7.5MB. Both must complete scanning within 60 seconds
+
+
+Build the complete working application. Start with main.py and requirements.txt, then engines/parser.py, then engines/flags.py, then engines/scorer.py, then frontend/index.html. Show each file completely before moving to the next.
