@@ -54,7 +54,7 @@ FALLBACK_THRESHOLD = 1_000_000_000
 # Fix 4 — only flag MISSING_LOCATION for physical/deliverable project types
 PHYSICAL_PROJECT_KEYWORDS = [
     'construction', 'rehabilitation', 'renovation', 'procurement', 'supply',
-    'establishment', 'provision', 'installation', 'repair', 'building',
+    'establishment', 'provision', 'installation', 'repair',
 ]
 
 
@@ -184,17 +184,33 @@ def flag_missing_location(row: Dict) -> Optional[Dict]:
 
 # ─── Flag 4: DUPLICATE_CLUSTER ───────────────────────────────────────────────
 
+DUPLICATE_ACTION_VERBS = {
+    'construction', 'rehabilitation', 'renovation', 'procurement', 'supply',
+    'provision', 'installation', 'repair', 'purchase', 'training',
+    'establishment', 'development', 'remodelling', 'equipping', 'furnishing',
+    'completion',
+}
+
+
+def _has_action_verb(description: str) -> bool:
+    """True if description contains at least one project action verb."""
+    desc_lower = description.lower()
+    return any(v in desc_lower for v in DUPLICATE_ACTION_VERBS)
+
+
 def flag_duplicates(rows: List[Dict]) -> List[Dict]:
     """
     Group rows by description similarity ≥95% into clusters.
-    Only compare descriptions > 20 chars that don't start with a digit.
+    Only compare descriptions ≥40 chars, not starting with a digit,
+    and containing at least one project action verb.
     Returns modified rows list with DUPLICATE_CLUSTER flags added.
     """
     candidates = [
         r for r in rows
         if r.get('description')
-        and len(r['description']) > 20
+        and len(r['description']) >= 40
         and not r['description'][0].isdigit()
+        and _has_action_verb(r['description'])
     ]
 
     visited = set()

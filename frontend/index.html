@@ -156,6 +156,13 @@ body {
 }
 .btn-pdf:hover { background: var(--accent-hover); }
 
+.btn-clear {
+  background: none; color: var(--muted); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 18px; font-size: 13px; font-weight: 600;
+  font-family: inherit; cursor: pointer; transition: all 0.2s; margin-left: 10px;
+}
+.btn-clear:hover { border-color: var(--muted); color: var(--text); }
+
 .results-section { display: none; }
 .results-section.visible { display: block; }
 
@@ -356,14 +363,15 @@ tbody td { padding: 12px 14px; font-size: 12px; vertical-align: middle; }
     </div>
 
     <div class="flag-pills">
-      <div class="pill">Duplicate Clusters <span class="count" id="pillDuplicates">0</span></div>
-      <div class="pill">Inflated Amounts <span class="count" id="pillInflated">0</span></div>
-      <div class="pill">Context Mismatch <span class="count" id="pillContext">0</span></div>
-      <div class="pill">No Location <span class="count" id="pillLocation">0</span></div>
-      <div class="pill">Ghost Projects <span class="count" id="pillGhost">0</span></div>
+      <div class="pill" id="wrapDuplicates">Duplicate Clusters <span class="count" id="pillDuplicates">0</span></div>
+      <div class="pill" id="wrapInflated">Inflated Amounts <span class="count" id="pillInflated">0</span></div>
+      <div class="pill" id="wrapContext">Context Mismatch <span class="count" id="pillContext">0</span></div>
+      <div class="pill" id="wrapLocation">No Location <span class="count" id="pillLocation">0</span></div>
+      <div class="pill" id="wrapGhost">Ghost Projects <span class="count" id="pillGhost">0</span></div>
     </div>
 
     <button class="btn-pdf" onclick="downloadPDF()">⬇ Download PDF Report</button>
+    <button class="btn-clear" onclick="clearScan()">✕ Scan Another File</button>
   </div>
 
   <!-- Results -->
@@ -527,6 +535,11 @@ function showError(msg) {
 function hideError() { document.getElementById('errorBanner').classList.remove('visible'); }
 
 // ── Summary ───────────────────────────────────────────────────────────────
+function setPill(wrapId, spanId, count) {
+  document.getElementById(spanId).textContent = count;
+  document.getElementById(wrapId).style.display = count > 0 ? '' : 'none';
+}
+
 function renderSummary(d) {
   document.getElementById('sumHigh').textContent   = d.high_risk   || 0;
   document.getElementById('sumMedium').textContent = d.medium_risk || 0;
@@ -535,23 +548,46 @@ function renderSummary(d) {
   document.getElementById('sumFlaggedSub').textContent = `${d.flagged_items} of ${d.total_items} items`;
   document.getElementById('sumAtRisk').textContent     = fmtNGN(d.at_risk_amount);
   const fs = d.flag_summary || {};
-  document.getElementById('pillDuplicates').textContent = fs.duplicate_clusters || 0;
-  document.getElementById('pillInflated').textContent   = fs.inflated_amounts   || 0;
-  document.getElementById('pillContext').textContent    = fs.context_mismatch   || 0;
-  document.getElementById('pillLocation').textContent   = fs.missing_location   || 0;
-  document.getElementById('pillGhost').textContent      = fs.ghost_projects     || 0;
+  setPill('wrapDuplicates', 'pillDuplicates', fs.duplicate_clusters || 0);
+  setPill('wrapInflated',   'pillInflated',   fs.inflated_amounts   || 0);
+  setPill('wrapContext',    'pillContext',     fs.context_mismatch   || 0);
+  setPill('wrapLocation',   'pillLocation',   fs.missing_location   || 0);
+  setPill('wrapGhost',      'pillGhost',       fs.ghost_projects     || 0);
 }
 
 function fmtNGN(v) {
-  if (!v && v !== 0) return '—';
-  if (v >= 1e9) return '₦' + (v/1e9).toFixed(2) + 'B';
-  if (v >= 1e6) return '₦' + (v/1e6).toFixed(1) + 'M';
-  return '₦' + Math.round(v).toLocaleString();
+  if (v === null || v === undefined || v === '' || (typeof v === 'number' && isNaN(v))) return '—';
+  const n = Number(v);
+  if (isNaN(n)) return '—';
+  if (n >= 1e9) return '₦' + (n/1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return '₦' + (n/1e6).toFixed(1) + 'M';
+  return '₦' + Math.round(n).toLocaleString();
 }
 
 function fmtNGNFull(v) {
-  if (!v && v !== 0) return '—';
-  return '₦' + Math.round(v).toLocaleString();
+  if (v === null || v === undefined || v === '' || (typeof v === 'number' && isNaN(v))) return '—';
+  const n = Number(v);
+  if (isNaN(n)) return '—';
+  return '₦' + Math.round(n).toLocaleString();
+}
+
+// ── Clear / Reset ─────────────────────────────────────────────────────────
+function clearScan() {
+  scanData = null; allResults = []; filteredResults = [];
+  currentFilter = 'HIGH'; currentSearch = ''; currentPage = 1;
+  showLowRisk = false; selectedFile = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('fileInfo').style.display = 'none';
+  document.getElementById('fileName').textContent = '—';
+  document.getElementById('fileSize').textContent = '—';
+  document.getElementById('budgetYear').value = '';
+  document.getElementById('ministry').value = '';
+  document.getElementById('searchBox').value = '';
+  document.getElementById('tableBody').innerHTML = '';
+  hideResults();
+  hideError();
+  updateBtn();
+  window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────
@@ -696,90 +732,169 @@ function downloadPDF() {
   const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
   const W=210, H=297, M=18, CW=W-M*2;
 
+  // ── Palette (white professional document) ──────────────────────────────
+  const C = {
+    white:   [255,255,255],
+    black:   [26,26,26],
+    body:    [51,51,51],
+    muted:   [110,110,110],
+    red:     [192,57,43],
+    orange:  [230,126,34],
+    green:   [39,174,96],
+    rowBg:   [245,245,245],
+    border:  [224,224,224],
+    divider: [220,220,220],
+  };
+
+  function setCol(rgb) { doc.setTextColor(...rgb); }
+  function setFill(rgb) { doc.setFillColor(...rgb); }
+  function setDraw(rgb) { doc.setDrawColor(...rgb); }
+
   function footer(n) {
-    doc.setFontSize(7.5); doc.setTextColor(110,110,110);
-    doc.text('UDEME — Social Accountability Platform | CJID | cjid.net | Page '+n, W/2, H-7, {align:'center'});
+    setDraw(C.border); doc.setLineWidth(0.3);
+    doc.line(M, H-12, W-M, H-12);
+    doc.setFontSize(7); setCol(C.muted);
+    doc.text('UDEME — Social Accountability Platform | Centre for Journalism Innovation & Development | cjid.net', M, H-8);
+    doc.text('Page ' + n, W-M, H-8, {align:'right'});
   }
 
-  function tr(s,max) { return (!s||s==='undefined') ? '—' : s.length>max ? s.slice(0,max-1)+'…' : s; }
+  function sectionHeader(title, y) {
+    doc.setFontSize(13); doc.setFont('helvetica','bold'); setCol(C.red);
+    doc.text(title, M, y);
+    setDraw(C.red); doc.setLineWidth(0.5);
+    doc.line(M, y+2, W-M, y+2);
+    doc.setLineWidth(0.3);
+    return y + 10;
+  }
+
+  function tr(s, max) {
+    if (!s || s === 'undefined' || s === 'null') return '—';
+    const str = String(s);
+    return str.length > max ? str.slice(0, max-1) + '…' : str;
+  }
 
   function fmtP(v) {
-    if (!v&&v!==0) return '—';
-    if (v>=1e9) return 'NGN '+(v/1e9).toFixed(2)+'B';
-    if (v>=1e6) return 'NGN '+(v/1e6).toFixed(1)+'M';
-    return 'NGN '+Math.round(v).toLocaleString();
+    if (v === null || v === undefined || (typeof v === 'number' && isNaN(v))) return '—';
+    const n = Number(v);
+    if (isNaN(n)) return '—';
+    if (n >= 1e9) return 'NGN ' + (n/1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return 'NGN ' + (n/1e6).toFixed(1) + 'M';
+    return 'NGN ' + Math.round(n).toLocaleString();
   }
 
+  function riskText(level) {
+    if (level === 'HIGH')   return { label:'HIGH RISK',   col: C.red };
+    if (level === 'MEDIUM') return { label:'MEDIUM RISK', col: C.orange };
+    return { label:'LOW RISK', col: C.green };
+  }
+
+  const yr = document.getElementById('budgetYear').value || '—';
   let pn = 1;
 
-  // Page 1: Cover
-  doc.setFillColor(15,15,15); doc.rect(0,0,W,H,'F');
-  doc.setFillColor(232,52,28); doc.rect(0,0,W,10,'F');
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(20); doc.setFont('helvetica','bold');
-  doc.text('UDEME Budget Red-Flag Scan Report', W/2, 55, {align:'center'});
-  doc.setFontSize(11); doc.setFont('helvetica','normal'); doc.setTextColor(160,160,160);
-  doc.text('Centre for Journalism Innovation & Development', W/2, 65, {align:'center'});
+  // ── Page 1: Cover ─────────────────────────────────────────────────────
+  setFill(C.white); doc.rect(0,0,W,H,'F');
 
-  doc.setFillColor(28,28,28); doc.roundedRect(M, 80, CW, 85, 4, 4, 'F');
-  const yr = document.getElementById('budgetYear').value || '—';
-  const lines2 = [
-    ['File', tr(selectedFile?.name||'—', 52)],
-    ['Budget Year', yr],
-    ['Scan Date', new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'})],
-    ['Total Items Scanned', (scanData.total_items||0).toLocaleString()],
-    ['Items Flagged', (scanData.flagged_items||0).toLocaleString()],
-    ['High Risk', (scanData.high_risk||0).toLocaleString()],
-    ['Medium Risk', (scanData.medium_risk||0).toLocaleString()],
-    ['Total At-Risk', fmtP(scanData.at_risk_amount)],
+  // Red top bar
+  setFill(C.red); doc.rect(0,0,W,14,'F');
+  doc.setFontSize(11); doc.setFont('helvetica','bold'); setCol(C.white);
+  doc.text('UDEME', M, 9.5);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  doc.text('Social Accountability Platform', M+24, 9.5);
+
+  // Title block
+  doc.setFontSize(26); doc.setFont('helvetica','bold'); setCol(C.black);
+  doc.text('Budget Red-Flag', M, 55);
+  doc.text('Scan Report', M, 67);
+  setFill(C.red); doc.rect(M, 72, 38, 1.2, 'F');
+
+  doc.setFontSize(10); doc.setFont('helvetica','normal'); setCol(C.body);
+  doc.text('Centre for Journalism Innovation & Development', M, 80);
+  doc.text('Powered by UDEME · cjid.net', M, 86);
+
+  // Stats box
+  setDraw(C.border); setFill(C.white); doc.setLineWidth(0.4);
+  doc.roundedRect(M, 100, CW, 82, 3, 3, 'FD');
+
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); setCol(C.red);
+  doc.text('SCAN SUMMARY', M+7, 110);
+  setDraw(C.divider); doc.line(M+7, 112, M+CW-7, 112);
+
+  const coverRows = [
+    ['File',                  tr(selectedFile?.name||'—', 50)],
+    ['Budget Year',           yr],
+    ['Scan Date',             new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'})],
+    ['Total Items Scanned',   (scanData.total_items||0).toLocaleString()],
+    ['Items Flagged',         (scanData.flagged_items||0).toLocaleString()],
+    ['High Risk Items',       (scanData.high_risk||0).toLocaleString()],
+    ['Medium Risk Items',     (scanData.medium_risk||0).toLocaleString()],
+    ['Total At-Risk Amount',  fmtP(scanData.at_risk_amount)],
   ];
-  let ry = 92;
-  lines2.forEach(([lbl,val]) => {
-    doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(130,130,130);
-    doc.text(lbl+':', M+8, ry);
-    doc.setFont('helvetica','normal'); doc.setTextColor(230,230,230);
-    doc.text(String(val), M+68, ry);
+  let ry = 119;
+  coverRows.forEach(([lbl, val], idx) => {
+    if (idx % 2 === 0) { setFill(C.rowBg); doc.rect(M+1, ry-4, CW-2, 7.5, 'F'); }
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); setCol(C.muted);
+    doc.text(lbl, M+7, ry);
+    doc.setFont('helvetica','normal'); setCol(C.black);
+    doc.text(String(val), M+80, ry);
     ry += 8;
   });
+
+  // Confidentiality note
+  doc.setFontSize(7.5); doc.setFont('helvetica','italic'); setCol(C.muted);
+  doc.text('This report is generated automatically by algorithmic analysis. All findings require human editorial verification before publication.', M, H-20, {maxWidth: CW});
+
   footer(pn);
 
-  // Page 2: Flag Summary
+  // ── Page 2: Flag Summary + Top 10 ────────────────────────────────────
   doc.addPage(); pn++;
-  doc.setFillColor(15,15,15); doc.rect(0,0,W,H,'F');
-  doc.setFillColor(232,52,28); doc.rect(0,0,W,4,'F');
-  doc.setTextColor(255,255,255); doc.setFontSize(14); doc.setFont('helvetica','bold');
-  doc.text('Flag Summary', M, 20);
+  setFill(C.white); doc.rect(0,0,W,H,'F');
+  setFill(C.red); doc.rect(0,0,W,8,'F');
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); setCol(C.white);
+  doc.text('UDEME Budget Red-Flag Scan Report · ' + yr, M, 5.5);
 
-  const fs = scanData.flag_summary||{};
+  let cy = 22;
+  cy = sectionHeader('Flag Summary', cy);
+
+  const fs = scanData.flag_summary || {};
   const fRows = [
     ['Duplicate Clusters', fs.duplicate_clusters||0],
     ['Inflated Amounts',   fs.inflated_amounts  ||0],
-    ['Context Mismatch',  fs.context_mismatch  ||0],
-    ['Missing Location',  fs.missing_location  ||0],
-    ['Ghost Projects',    fs.ghost_projects    ||0],
+    ['Context Mismatch',   fs.context_mismatch  ||0],
+    ['Missing Location',   fs.missing_location  ||0],
+    ['Ghost Projects',     fs.ghost_projects    ||0],
   ];
-  let fy = 30;
-  fRows.forEach(([lbl,cnt]) => {
-    doc.setFillColor(28,28,28); doc.rect(M,fy,CW,8,'F');
-    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(200,200,200);
-    doc.text(lbl, M+4, fy+5.5);
-    doc.setFont('helvetica','bold'); doc.setTextColor(232,52,28);
-    doc.text(String(cnt), M+CW-4, fy+5.5, {align:'right'});
-    fy += 10;
+  fRows.forEach(([lbl, cnt], idx) => {
+    if (idx % 2 === 0) { setFill(C.rowBg); } else { setFill(C.white); }
+    doc.rect(M, cy, CW, 8, 'F');
+    setDraw(C.border); doc.rect(M, cy, CW, 8, 'S');
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); setCol(C.body);
+    doc.text(lbl, M+4, cy+5.5);
+    doc.setFont('helvetica','bold'); setCol(cnt > 0 ? C.red : C.muted);
+    doc.text(String(cnt), M+CW-4, cy+5.5, {align:'right'});
+    cy += 8;
   });
 
-  doc.setFontSize(12); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
-  doc.text('Top 10 Most Suspicious Items', M, fy+10);
-  fy += 18;
+  cy += 10;
+  cy = sectionHeader('Top 10 Most Suspicious Items', cy);
+
   const top10 = [...allResults].sort((a,b)=>(b.risk_score||0)-(a.risk_score||0)).slice(0,10);
-  top10.forEach((r,i) => {
-    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(190,190,190);
-    doc.text(`${i+1}. ${tr(r.description,52)} | ${fmtP(r.amount)} | ${tr(r.location||'—',22)} | Score: ${r.risk_score}`, M, fy);
-    fy += 7;
+  top10.forEach((r, i) => {
+    const rt = riskText(r.risk_level);
+    const isEven = i % 2 === 0;
+    setFill(isEven ? C.rowBg : C.white); doc.rect(M, cy, CW, 8.5, 'F');
+    setDraw(C.border); doc.rect(M, cy, CW, 8.5, 'S');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setCol(C.black);
+    doc.text(`${i+1}. ${tr(r.description, 55)}`, M+3, cy+3.5);
+    doc.setFont('helvetica','normal'); setCol(C.muted);
+    doc.text(`${fmtP(r.amount)}  ·  ${tr(r.location||'—', 20)}`, M+3, cy+7);
+    doc.setFont('helvetica','bold'); setCol(rt.col);
+    doc.text(rt.label, M+CW-3, cy+5, {align:'right'});
+    cy += 8.5;
   });
+
   footer(pn);
 
-  // Pages 3–9: Findings per category
+  // ── Pages 3–8: One page per flag category ─────────────────────────────
   const cats = [
     {key:'DUPLICATE_CLUSTER', label:'Duplicate Clusters'},
     {key:'INFLATED_AMOUNT',   label:'Inflated Amounts'},
@@ -790,55 +905,95 @@ function downloadPDF() {
 
   cats.forEach(cat => {
     if (pn >= 9) return;
-    const items = allResults.filter(r=>(r.flags||[]).some(f=>f.flag_type===cat.key)).slice(0,5);
+    const items = allResults.filter(r=>(r.flags||[]).some(f=>f.flag_type===cat.key)).slice(0,6);
     if (!items.length) return;
     doc.addPage(); pn++;
-    doc.setFillColor(15,15,15); doc.rect(0,0,W,H,'F');
-    doc.setFillColor(232,52,28); doc.rect(0,0,W,4,'F');
-    doc.setTextColor(255,255,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
-    doc.text(cat.label, M, 18);
-    let cy = 28;
-    items.forEach(r => {
+    setFill(C.white); doc.rect(0,0,W,H,'F');
+    setFill(C.red); doc.rect(0,0,W,8,'F');
+    doc.setFontSize(8); doc.setFont('helvetica','bold'); setCol(C.white);
+    doc.text('UDEME Budget Red-Flag Scan Report · ' + yr, M, 5.5);
+
+    let cy2 = 22;
+    cy2 = sectionHeader(cat.label, cy2);
+
+    items.forEach((r, idx) => {
       const flag = (r.flags||[]).find(f=>f.flag_type===cat.key);
-      doc.setFillColor(26,26,26); doc.roundedRect(M,cy,CW,28,3,3,'F');
-      doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(235,235,235);
-      doc.text(tr(r.description,62), M+4, cy+8);
-      doc.setFont('helvetica','normal'); doc.setTextColor(170,170,170);
-      doc.text(`Amount: ${fmtP(r.amount)}  |  Location: ${tr(r.location||'—',26)}`, M+4, cy+15);
-      const rc = r.risk_level==='HIGH' ? [232,52,28] : r.risk_level==='MEDIUM' ? [245,158,11] : [34,197,94];
-      doc.setTextColor(...rc); doc.setFont('helvetica','bold'); doc.setFontSize(8);
-      doc.text(r.risk_level+' ('+r.risk_score+')', M+CW-4, cy+8, {align:'right'});
-      if (flag) {
-        doc.setFont('helvetica','normal'); doc.setTextColor(140,140,140); doc.setFontSize(7.5);
-        const expl = cat.key==='DUPLICATE_CLUSTER' ? `Appears ${flag.cluster_size||'?'} times in budget` : tr(flag.explanation,95);
-        doc.text(expl, M+4, cy+22);
+      const rt = riskText(r.risk_level);
+      const cardH = 32;
+      setFill(C.rowBg); setDraw(C.border); doc.setLineWidth(0.3);
+      doc.roundedRect(M, cy2, CW, cardH, 2, 2, 'FD');
+
+      // Left red accent bar
+      setFill(rt.col); doc.rect(M, cy2, 1.8, cardH, 'F');
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(8.5); setCol(C.black);
+      const descLines = doc.splitTextToSize(tr(r.description, 90), CW-30);
+      doc.text(descLines[0], M+5, cy2+7);
+
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setCol(C.muted);
+      doc.text(`Amount: ${fmtP(r.amount)}`, M+5, cy2+13.5);
+      doc.text(`Location: ${tr(r.location||'—', 30)}`, M+5, cy2+19);
+
+      // Risk label (text only, no box)
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); setCol(rt.col);
+      doc.text(rt.label, M+CW-3, cy2+7, {align:'right'});
+      doc.setFontSize(7); setCol(C.muted);
+      doc.text('Score: ' + (r.risk_score||0), M+CW-3, cy2+13, {align:'right'});
+
+      if (flag && flag.explanation) {
+        doc.setFont('helvetica','italic'); doc.setFontSize(7); setCol(C.body);
+        const expl = cat.key==='DUPLICATE_CLUSTER'
+          ? `Appears ${flag.cluster_size||'?'} times in budget — verify each is a distinct project at a separate location.`
+          : flag.explanation;
+        const ls = doc.splitTextToSize(tr(expl, 120), CW-10);
+        doc.text(ls[0], M+5, cy2+25.5);
       }
-      cy += 33;
+      cy2 += cardH + 5;
     });
+
     footer(pn);
   });
 
-  // Page 10: Methodology
+  // ── Page: Methodology ─────────────────────────────────────────────────
   doc.addPage(); pn++;
-  doc.setFillColor(15,15,15); doc.rect(0,0,W,H,'F');
-  doc.setFillColor(232,52,28); doc.rect(0,0,W,4,'F');
-  doc.setTextColor(255,255,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
-  doc.text('Methodology', M, 18);
+  setFill(C.white); doc.rect(0,0,W,H,'F');
+  setFill(C.red); doc.rect(0,0,W,8,'F');
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); setCol(C.white);
+  doc.text('UDEME Budget Red-Flag Scan Report · ' + yr, M, 5.5);
+
+  let my = 22;
+  my = sectionHeader('Methodology & Recommended Actions', my);
+
   const methods = [
-    {t:'Inflated Amount', b:'Compares each line item against category-specific cost benchmarks for Nigerian infrastructure. Items exceeding the benchmark are flagged. Recommended action: Cross-reference with BOQ and market rates for the project type.'},
-    {t:'Context Mismatch', b:'Flags items where the amount is grossly disproportionate for the category even though it falls below ₦1B. Recommended action: Request an itemised breakdown and supporting documents.'},
-    {t:'Missing Location', b:'Flags capital expenditure above ₦5M with no attached LGA, ward, or constituency. Without a location, physical verification is impossible. Recommended action: File an FOI request for implementation details.'},
-    {t:'Duplicate Cluster', b:'Groups budget lines with ≥95% description similarity. Recommended action: Verify each listed project is at a distinct location with unique beneficiaries.'},
-    {t:'Ghost Project', b:'Detects descriptions referencing years 2+ years before the current budget, indicating potentially recycled or unimplemented projects. Recommended action: File a performance audit request.'},
+    {t:'Inflated Amount', b:'Each line item is compared against category-specific cost benchmarks for Nigerian infrastructure projects. Items exceeding the benchmark trigger this flag. Recommended action: Cross-reference with the Bill of Quantities (BOQ) and current market rates for the project type. File a Freedom of Information request for procurement records.'},
+    {t:'Context Mismatch', b:'Flags items where the amount is grossly disproportionate for the category even though it falls below ₦1 billion. Recommended action: Request an itemised breakdown and supporting procurement documents from the relevant MDA.'},
+    {t:'Missing Location', b:'Capital expenditure above ₦5M with no attached LGA, ward, or constituency is flagged. Without a physical location, independent verification of delivery is impossible. Recommended action: File an FOI request for project implementation and geo-tagged evidence.'},
+    {t:'Duplicate Cluster', b:'Descriptions with ≥95% similarity are grouped as duplicate clusters. Legitimate budgets may repeat similar items at different locations, but identical descriptions at the same location are suspicious. Recommended action: Verify that each clustered project is at a genuinely distinct location with unique beneficiaries.'},
+    {t:'Ghost Project', b:'Descriptions referencing a year 2+ years before the current budget year indicate potentially recycled or unimplemented projects. These may be rolled-over items presented as new appropriations. Recommended action: File a performance audit request with the Auditor-General\'s office.'},
   ];
-  let my = 28;
+
   methods.forEach(m => {
-    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(232,52,28);
-    doc.text(m.t, M, my); my += 5;
-    doc.setFont('helvetica','normal'); doc.setTextColor(195,195,195); doc.setFontSize(8);
+    if (my > H - 40) return;
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); setCol(C.red);
+    doc.text(m.t, M, my);
+    setDraw(C.divider); doc.setLineWidth(0.3); doc.line(M, my+1.5, M+CW, my+1.5);
+    my += 5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); setCol(C.body);
     const ls = doc.splitTextToSize(m.b, CW);
-    doc.text(ls, M, my); my += ls.length*4.8 + 6;
+    doc.text(ls, M, my);
+    my += ls.length * 4.5 + 8;
   });
+
+  // Disclaimer
+  setFill(C.rowBg); setDraw(C.border); doc.setLineWidth(0.3);
+  doc.roundedRect(M, my+4, CW, 20, 2, 2, 'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setCol(C.red);
+  doc.text('Important Disclaimer', M+5, my+11);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setCol(C.body);
+  const dis = 'This report is generated by an automated algorithm and does not constitute legal or forensic evidence. All flagged items require independent journalistic verification before publication. CJID and UDEME accept no liability for editorial decisions made on the basis of this report.';
+  const dls = doc.splitTextToSize(dis, CW-10);
+  doc.text(dls, M+5, my+17);
+
   footer(pn);
 
   doc.save(`UDEME-Scan-${yr}.pdf`);

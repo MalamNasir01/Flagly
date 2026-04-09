@@ -1,0 +1,38 @@
+Two major improvements needed:
+Fix 1 — Complete PDF report redesign: light/white professional document
+Redesign the entire PDF report to look like a professional journalism document, not a dark UI. Use jsPDF with these exact styling rules:
+
+Page background: white (#FFFFFF)
+Primary text: dark grey (#1a1a1a)
+Section headers: deep red (#C0392B), bold, 14pt
+Body text: 10pt, #333333
+Table header rows: light grey background (#F5F5F5), bold
+Risk badges: text only — write "HIGH RISK" in red (#C0392B), "MEDIUM RISK" in orange (#E67E22), "LOW RISK" in green (#27AE60) — no coloured background boxes
+Borders: thin light grey lines (#E0E0E0) on tables
+Cover page: white background, UDEME logo text top left in red, title "Budget Red-Flag Scan Report" in large dark bold text, summary stats in a clean bordered box
+Remove ALL dark backgrounds, dark cards, coloured card backgrounds from the PDF entirely
+Font: helvetica throughout (built into jsPDF, no external fonts needed)
+
+The report page structure stays the same (Cover, Flag Summary + Top 10, one page per flag category, Methodology) but must look like a Word document a journalist would print and hand to an editor.
+Fix 2 — Fix duplicate clustering quality
+The duplicate clusters contain garbage matches like "OFFICE BUILDINGS ORGANS", "SET ORGANS", "BUILDINGS ORGANS", "HOUSING ORGANS" — these are economic classification code fragments, not real project names. These are slipping through because the description length filter is too loose.
+Update the duplicate engine in flags.py:
+
+Minimum description length for duplicate checking: 40 characters (up from 20)
+Description must contain at least one verb or action word to qualify — check for presence of any of: construction, rehabilitation, renovation, procurement, supply, provision, installation, repair, purchase, training, establishment, development, remodelling, equipping, furnishing, completion
+If none of those words appear in the description, skip it from duplicate clustering entirely
+This will eliminate "OFFICE BUILDINGS ORGANS" type matches while keeping real project duplicates like "Construction of PHC at Rijau LGA"
+
+Fix 3 — Full UI audit and cleanup
+Go through the entire index.html and fix every visual and functional issue:
+
+Amounts showing "—" in the flagged items table for rows that have valid amounts in the data — trace why item.amount is null for these rows and fix the display
+Risk score bar colours: must be red for HIGH, amber/orange for MEDIUM, green for LOW — check if CSS classes are applying correctly
+The "No Location" flag count (3,823) is too high and cluttering the UI — apply the keyword filter from the previous fix (only flag missing location on construction/procurement type items)
+On mobile: check the summary cards don't overflow horizontally — they should stack 2x2 on small screens
+The flag pills row below the summary cards: if any count is 0, hide that pill entirely rather than showing "Ghost Projects 0"
+Search box: confirm it actually filters the table in real time as the user types
+Pagination: confirm "Prev" and "Next" buttons work correctly and page numbers update
+When a row is clicked to open the detail modal, confirm the full untruncated description shows, the full location shows, and all flag explanations render correctly
+Confirm the "Download PDF Report" button is only visible after a scan completes, not on page load
+Add a "Clear / Scan Another File" button that resets the entire UI back to the upload state
