@@ -3,7 +3,7 @@ import math
 import json
 import traceback
 from typing import Optional
-from fastapi import FastAPI, File, UploadFile, Form
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -93,7 +93,15 @@ async def scan(
 ):
     try:
         contents = await file.read()
+        file_size_mb = len(contents) / (1024 * 1024)
+        if file_size_mb > 50:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File too large ({file_size_mb:.1f} MB). Maximum size is 50 MB.",
+            )
+
         filename = file.filename or "upload"
+        print(f"[scan] Processing '{filename}' ({file_size_mb:.1f} MB)")
 
         df = parse_file(contents, filename)
 
@@ -173,6 +181,8 @@ async def scan(
             "results": results,
         })
 
+    except HTTPException:
+        raise
     except Exception as e:
         traceback.print_exc()
         return json_response({"error": f"Scan failed: {str(e)}"}, status_code=400)
@@ -181,4 +191,10 @@ async def scan(
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 5000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=port,
+        reload=False,
+        timeout_keep_alive=120,
+    )

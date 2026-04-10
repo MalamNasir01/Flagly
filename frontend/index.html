@@ -492,13 +492,13 @@ async function runScan() {
   form.append('file', selectedFile);
   form.append('budget_year', yr);
   if (min) form.append('ministry', min);
-  document.getElementById('loadingText').textContent = `Scanning ${selectedFile.name}…`;
 
   try {
     const res  = await fetch('/scan', { method: 'POST', body: form });
     const data = await res.json();
     setLoading(false);
-    if (data.error) { showError(data.error); return; }
+    const errMsg = data.error || data.detail;
+    if (errMsg) { showError(errMsg); return; }
     scanData = data;
     allResults = data.results || [];
     renderSummary(data);
@@ -511,9 +511,32 @@ async function runScan() {
   }
 }
 
+const PROGRESS_MESSAGES = [
+  'Parsing budget file…',
+  'Running red-flag analysis…',
+  'Calculating risk scores…',
+  'Preparing results…',
+  'Still working — large files take up to 60 seconds…',
+  'Almost done…',
+];
+let _progressTimer = null;
+let _progressIdx = 0;
+
 function setLoading(on) {
   document.getElementById('loadingOverlay').classList.toggle('active', on);
   document.getElementById('btnScan').style.display = on ? 'none' : 'block';
+  if (on) {
+    _progressIdx = 0;
+    document.getElementById('loadingText').textContent = PROGRESS_MESSAGES[0];
+    _progressTimer = setInterval(() => {
+      _progressIdx = Math.min(_progressIdx + 1, PROGRESS_MESSAGES.length - 1);
+      document.getElementById('loadingText').textContent = PROGRESS_MESSAGES[_progressIdx];
+    }, 5000);
+  } else {
+    clearInterval(_progressTimer);
+    _progressTimer = null;
+    document.getElementById('loadingText').textContent = 'Scanning file…';
+  }
 }
 
 function hideResults() {

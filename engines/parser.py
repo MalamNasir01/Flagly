@@ -90,6 +90,9 @@ def _detect_format_b(pdf) -> bool:
 
 # ─── Format A — Federal Appropriation Bill ──────────────────────────────────
 
+MAX_PAGES_FORMAT_A = 500
+
+
 def _parse_pdf_format_a(contents: bytes) -> pd.DataFrame:
     """MDA-level federal budget. Extract from pdfplumber tables."""
     import pdfplumber
@@ -97,8 +100,12 @@ def _parse_pdf_format_a(contents: bytes) -> pd.DataFrame:
     rows = []
     try:
         with pdfplumber.open(io.BytesIO(contents)) as pdf:
+            total_pages = len(pdf.pages)
+            pages_to_process = pdf.pages[:MAX_PAGES_FORMAT_A]
+            if total_pages > MAX_PAGES_FORMAT_A:
+                print(f"[parser] Format A: {total_pages} pages — capping at {MAX_PAGES_FORMAT_A}")
             has_tables = False
-            for page in pdf.pages:
+            for page in pages_to_process:
                 try:
                     tables = page.extract_tables()
                     if not tables:

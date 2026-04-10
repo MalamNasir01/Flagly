@@ -1,0 +1,33 @@
+The 7.5MB Federal Appropriation Bill PDF (2,790 pages) is failing with "Unexpected end of JSON input" — the backend is timing out or crashing silently before returning a response. The Niger State PDF works fine but this larger file fails.
+Fix these issues:
+Fix 1 — Increase timeout and add file size handling
+In main.py, add a file size check at the start of the /scan endpoint:
+pythoncontents = await file.read()
+file_size_mb = len(contents) / (1024 * 1024)
+if file_size_mb > 50:
+    raise HTTPException(status_code=400, detail="File too large. Maximum size is 50MB.")
+Also increase uvicorn timeout — add --timeout-keep-alive 120 to the startup command.
+Fix 2 — For large PDFs, limit pages processed
+In parser.py, for Format A (Federal budget) PDFs with more than 500 pages, process a maximum of 500 pages. Add at the start of the pdfplumber loop:
+pythonpages_to_process = pdf.pages[:500] if len(pdf.pages) > 500 else pdf.pages
+The Federal Appropriation Bill has 2,790 pages but most data is in the first 200-300 pages — the rest are ministry detail breakdowns. This will prevent memory exhaustion.
+Fix 3 — Add streaming progress response
+The frontend times out waiting because large files take 30-60 seconds with no feedback. Add a simple progress mechanism:
+
+In the frontend, show a progress message that cycles through these every 5 seconds while waiting: "Parsing budget file...", "Running red-flag analysis...", "Calculating risk scores...", "Preparing results..."
+This doesn't require backend changes — just update the loading state text in index.html on a timer while the fetch is pending
+
+Fix 4 — Wrap the entire scan endpoint in proper error handling
+python@app.post("/scan")
+async def scan(file: UploadFile, budget_year: str = Form(...), ministry: str = Form("")):
+    try:
+        contents = await file.read()
+        # ... rest of logic
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=f"Scan failed: {str(e)}")
+This ensures ANY crash returns a proper JSON error the frontend can display, never an empty response.
+After implementing, test with both the Niger State PDF (2.5MB) and the Federal PDF (7.5MB) and confirm both return results.
