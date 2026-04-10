@@ -123,6 +123,8 @@ def _parse_pdf_format_a(contents: bytes) -> pd.DataFrame:
                             # Columns: NO | CODE | MDA | PERSONNEL | OVERHEAD | CAPITAL | ... | TOTAL ALLOCATION
                             # Try to grab last numeric column as total allocation
                             mda_name = str(row[2] or '').strip() if len(row) > 2 else ''
+                            # Strip everything from the first digit sequence onward
+                            mda_name = re.sub(r'\s+[\d,]+.*$', '', mda_name).strip()
                             if not mda_name or len(mda_name) < 3:
                                 continue
                             amount_val = None
@@ -178,8 +180,8 @@ def _parse_pdf_format_a_text(contents: bytes) -> pd.DataFrame:
         if len(tokens) < 3:
             continue
         mda_name = ' '.join(tokens[2:])
-        # Strip trailing numbers
-        mda_name = re.sub(r'[\d,\.]+\s*$', '', mda_name).strip()
+        # Strip everything from the first digit sequence onward
+        mda_name = re.sub(r'\s+[\d,]+.*$', '', mda_name).strip()
         if not mda_name or len(mda_name) < 3:
             continue
         rows.append({
