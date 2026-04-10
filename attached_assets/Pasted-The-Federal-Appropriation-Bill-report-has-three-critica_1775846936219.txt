@@ -1,0 +1,30 @@
+The Federal Appropriation Bill report has three critical issues that make it unpublishable. Fix all three:
+Fix 1 — Format A description cleaning is still broken
+Rows like "PRESIDENCY 200,839,074,546 53,711,450,216 100,549,795,959 0 0" and "215,652,200,315 72,247,887,924 56,135,718,477 0 0" are appearing as descriptions. The MDA name extraction in Format A is not working.
+In parser.py, for Format A, after extracting each row from the pdftotext layout output, apply this cleaning pipeline to the description field:
+pythonimport re
+# Step 1: Remove everything from the first standalone number sequence onwards
+description = re.sub(r'\s{2,}[\d,]+\.?\d*.*$', '', raw_line).strip()
+# Step 2: If description is ONLY numbers (no letters), skip this row entirely
+if not re.search(r'[A-Za-z]{3,}', description):
+    continue
+# Step 3: Strip leading/trailing whitespace and truncate to 120 chars
+description = description[:120].strip()
+Also apply the same fix to the location field — location should never contain numbers. If the extracted location contains more digits than letters, set location = description (the MDA name).
+Fix 2 — Completely disable Inflated Amount and Context Mismatch for Format A
+In flags.py, the is_mda_level check is not working. Find EVERY place where INFLATED_AMOUNT and CONTEXT_MISMATCH flags are generated and add this guard at the very top of each function:
+pythondef check_inflated_amount(row, benchmarks):
+    if row.get('is_mda_level') is True:
+        return []  # Never flag MDA budget totals
+    if not row.get('amount') or pd.isna(row.get('amount')):
+        return []
+    # ... rest of function
+Confirm by checking: after this fix, the Federal PDF should show 0 Inflated Amount flags and 0 Context Mismatch flags.
+Fix 3 — Ghost project year detection is matching amounts, not years
+The ghost project detector is matching "2015" in "2015 (BATCH I) TO CONTRACTORS" where ₦2,015 is the amount — and "2030" in "EDUCATION 2030 FORA" where 2030 is a programme name, not a budget year.
+Fix the year detection regex to only match years that appear in a meaningful context:
+python# Only match if year appears with surrounding context suggesting it's a budget year
+# Pattern: year must be preceded by ( or space and followed by ) or space+word
+year_pattern = re.compile(r'(?<!\d)(201[0-9]|202[0-4])(?!\d)(?=\s*[\)\-]|\s+(?:BUDGET|APPROPRIATION|FY|FISCAL|BATCH|EDITION))', re.IGNORECASE)
+Also: only flag as ghost project if the matched year is at least 2 years before budget_year AND the item amount is greater than ₦1,000,000 (to exclude rows where the "year" is actually a small naira amount like ₦2,015 or ₦2,030).
+After all three fixes, the Federal PDF should show: 0 Inflated Amounts, 0 Context Mismatch, ~20 Duplicate Clusters, and only genuine Ghost Projects with real year references in the description.

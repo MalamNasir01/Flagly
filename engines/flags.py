@@ -79,6 +79,8 @@ def _has_physical_project_keyword(description: str) -> bool:
 # ─── Flag 1: INFLATED_AMOUNT ─────────────────────────────────────────────────
 
 def flag_inflated_amount(row: Dict) -> Optional[Dict]:
+    if row.get('is_mda_level'):
+        return None  # Never flag MDA-level budget totals
     amount = row.get('amount')
     description = row.get('description', '') or ''
     if _is_null_amount(amount):
@@ -117,6 +119,8 @@ def flag_inflated_amount(row: Dict) -> Optional[Dict]:
 # ─── Flag 2: CONTEXT_MISMATCH ────────────────────────────────────────────────
 
 def flag_context_mismatch(row: Dict) -> Optional[Dict]:
+    if row.get('is_mda_level'):
+        return None  # Never flag MDA-level budget totals
     amount = row.get('amount')
     description = row.get('description', '') or ''
     if _is_null_amount(amount):
@@ -268,7 +272,14 @@ def flag_duplicates(rows: List[Dict]) -> List[Dict]:
 
 # ─── Flag 5: GHOST_PROJECT ────────────────────────────────────────────────────
 
-YEAR_RE = re.compile(r'\b(19|20)\d{2}\b')
+# Only match years that appear in a budget-year context — preceded/followed by
+# indicators like FY, BATCH, BUDGET, a closing paren, or a dash.
+# This prevents matching ₦2,015 amounts or "EDUCATION 2030 FORA" programme names.
+YEAR_RE = re.compile(
+    r'(?<!\d)(201[0-9]|202[0-4])(?!\d)'
+    r'(?=\s*[\)\-]|\s+(?:BUDGET|APPROPRIATION|FY|FISCAL|BATCH|EDITION|PHASE|TRANCHE|CONTRACT))',
+    re.IGNORECASE,
+)
 
 
 def flag_ghost_project(row: Dict, all_descriptions: List[str], budget_year: Optional[str]) -> Optional[Dict]:
@@ -277,6 +288,11 @@ def flag_ghost_project(row: Dict, all_descriptions: List[str], budget_year: Opti
     try:
         by = int(budget_year)
     except ValueError:
+        return None
+
+    # Minimum amount guard: avoid matching ₦2,015 / ₦2,030 "amounts" as years
+    amount = row.get('amount')
+    if not _is_null_amount(amount) and float(amount) < 1_000_000:
         return None
 
     description = row.get('description', '') or ''

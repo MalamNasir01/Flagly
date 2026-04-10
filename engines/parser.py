@@ -123,9 +123,14 @@ def _parse_pdf_format_a(contents: bytes) -> pd.DataFrame:
                             # Columns: NO | CODE | MDA | PERSONNEL | OVERHEAD | CAPITAL | ... | TOTAL ALLOCATION
                             # Try to grab last numeric column as total allocation
                             mda_name = str(row[2] or '').strip() if len(row) > 2 else ''
-                            # Strip everything from the first digit sequence onward
+                            # Strip everything from the first double-space+digit sequence onward
+                            mda_name = re.sub(r'\s{2,}[\d,]+.*$', '', mda_name).strip()
+                            # Also strip single-space prefix numbers (fallback)
                             mda_name = re.sub(r'\s+[\d,]+.*$', '', mda_name).strip()
-                            if not mda_name or len(mda_name) < 3:
+                            # Skip if no meaningful text (pure-number rows)
+                            if not re.search(r'[A-Za-z]{3,}', mda_name):
+                                continue
+                            if len(mda_name) < 3:
                                 continue
                             amount_val = None
                             for cell in reversed(row):
@@ -179,10 +184,19 @@ def _parse_pdf_format_a_text(contents: bytes) -> pd.DataFrame:
         # MDA name: everything between token 2 and last numeric group
         if len(tokens) < 3:
             continue
-        mda_name = ' '.join(tokens[2:])
-        # Strip everything from the first digit sequence onward
-        mda_name = re.sub(r'\s+[\d,]+.*$', '', mda_name).strip()
-        if not mda_name or len(mda_name) < 3:
+        # Work on the original line (preserves layout spacing) to strip amounts
+        # \s{2,} = two or more spaces = column separator in pdftotext -layout output
+        mda_name = re.sub(r'\s{2,}[\d,]+\.?\d*.*$', '', stripped).strip()
+        # Strip any remaining leading row-number / code prefix (digit tokens at start)
+        mda_name = re.sub(r'^[\d\.]+\s+[\w\d]+\s+', '', mda_name).strip()
+        # Fallback: join tokens[2:] and strip numbers from there
+        if not re.search(r'[A-Za-z]{3,}', mda_name):
+            mda_name = re.sub(r'\s+[\d,]+.*$', '', ' '.join(tokens[2:])).strip()
+        # Final guard: skip rows where the name contains no meaningful text
+        if not re.search(r'[A-Za-z]{3,}', mda_name):
+            continue
+        mda_name = mda_name[:120].strip()
+        if len(mda_name) < 3:
             continue
         rows.append({
             'row_id': None,
