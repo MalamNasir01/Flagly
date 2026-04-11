@@ -1,6 +1,7 @@
 """
 parser.py — PDF/Excel/CSV parsing engine for UDEME Budget Scanner
-Handles Format A (Federal Appropriation Bill) and Format B (State project-level)
+Handles Format A (Federal MDA summary), Format B (State project-level),
+and Format C (Federal project-level, pages ~10–end of Appropriation Bill)
 """
 
 import re
@@ -12,13 +13,53 @@ import pandas as pd
 from typing import Optional
 
 
-LOCATION_CODE_RE = re.compile(r'\d{8,11}\s*-\s*[A-Z]{2,}')
-AMOUNT_RE = re.compile(r'[\d,]+\.\d{2}')
-MDA_CODE_RE = re.compile(r'\d{12,14}\s*-')
-FUNC_CODE_RE = re.compile(r'^\s*70\d{2,3}')
-LEADING_CODE_RE = re.compile(r'^\d{10,14}\s*-\s*')
-YEAR_IN_DESC_RE = re.compile(r'\b(19|20)\d{2}\b')
+# ─── Shared regex constants ───────────────────────────────────────────────────
 
+LOCATION_CODE_RE   = re.compile(r'\d{8,11}\s*-\s*[A-Z]{2,}')
+AMOUNT_RE          = re.compile(r'[\d,]+\.\d{2}')
+MDA_CODE_RE        = re.compile(r'\d{12,14}\s*-')
+FUNC_CODE_RE       = re.compile(r'^\s*70\d{2,3}')
+LEADING_CODE_RE    = re.compile(r'^\d{10,14}\s*-\s*')
+YEAR_IN_DESC_RE    = re.compile(r'\b(19|20)\d{2}\b')
+
+# ─── Format C regex constants ─────────────────────────────────────────────────
+
+# Project code: starts with a letter, 8-14 uppercase alphanum chars
+FORMAT_C_CODE_RE = re.compile(r'^([A-Z][A-Z0-9]{7,13})\s+(.+)', re.MULTILINE)
+
+# MDA section header on a Format C page: 10-14 digit code followed by a name
+FORMAT_C_SECTION_RE = re.compile(
+    r'^(\d{10,14})\s{1,6}([A-Z][A-Z0-9\s/\-&,.()\[\]]{4,100})$'
+)
+
+# Pages that are MDA summary pages — skip entirely
+FORMAT_C_SKIP_RE = re.compile(
+    r'SUMMARY\s+BY\s+MDAs|TOTAL\s+ALLOCATION\s+\d|'
+    r'PERSONNEL\s+COST\s+OVERHEAD\s+COST\s+CAPITAL',
+    re.IGNORECASE,
+)
+
+# ONGOING / NEW project type keyword
+TYPE_RE_C = re.compile(r'\b(ONGOING|NEW)\b')
+
+# Nigerian states for location extraction (sorted longest-first for greedy match)
+_NIGERIAN_STATES = [
+    'AKWA IBOM', 'CROSS RIVER', 'NASSARAWA',
+    'ABIA', 'ADAMAWA', 'ANAMBRA', 'BAUCHI', 'BAYELSA', 'BENUE', 'BORNO',
+    'DELTA', 'EBONYI', 'EDO', 'EKITI', 'ENUGU', 'FCT', 'ABUJA', 'GOMBE',
+    'IMO', 'JIGAWA', 'KADUNA', 'KANO', 'KATSINA', 'KEBBI', 'KOGI', 'KWARA',
+    'LAGOS', 'NIGER', 'OGUN', 'ONDO', 'OSUN', 'OYO', 'PLATEAU', 'RIVERS',
+    'SOKOTO', 'TARABA', 'YOBE', 'ZAMFARA',
+]
+_NIGERIA_STATES_RE = re.compile(
+    r'\b(' + '|'.join(re.escape(s) for s in _NIGERIAN_STATES) + r')\b',
+    re.IGNORECASE,
+)
+
+MAX_ROWS_FORMAT_C = 5_000
+
+
+# ─── Shared helpers ───────────────────────────────────────────────────────────
 
 def _strip_commas(val):
     if isinstance(val, str):
@@ -33,6 +74,8 @@ def _to_float(val):
         return None
 
 
+# ─── Entry point ─────────────────────────────────────────────────────────────
+
 def parse_file(contents: bytes, filename: str) -> Optional[pd.DataFrame]:
     """Entry point — dispatch by file extension."""
     try:
@@ -44,7 +87,6 @@ def parse_file(contents: bytes, filename: str) -> Optional[pd.DataFrame]:
         elif name_lower.endswith('.csv'):
             return _parse_csv(contents)
         else:
-            # Try PDF first, then Excel
             try:
                 return _parse_pdf(contents)
             except Exception:
@@ -54,7 +96,7 @@ def parse_file(contents: bytes, filename: str) -> Optional[pd.DataFrame]:
         return pd.DataFrame()
 
 
-# ─── PDF ────────────────────────────────────────────────────────────────────
+# ─── PDF dispatch ─────────────────────────────────────────────────────────────
 
 def _parse_pdf(contents: bytes) -> pd.DataFrame:
     """Detect format then dispatch."""
@@ -63,14 +105,20 @@ def _parse_pdf(contents: bytes) -> pd.DataFrame:
     except ImportError:
         return _parse_pdf_format_b(contents)
 
+    is_format_b = False
+    is_format_c = False
     try:
         with pdfplumber.open(io.BytesIO(contents)) as pdf:
             is_format_b = _detect_format_b(pdf)
+            if not is_format_b:
+                is_format_c = _detect_format_c(pdf)
     except Exception:
-        is_format_b = False
+        pass
 
     if is_format_b:
         return _parse_pdf_format_b(contents)
+    elif is_format_c:
+        return _parse_pdf_format_c(contents)
     else:
         return _parse_pdf_format_a(contents)
 
@@ -80,15 +128,38 @@ def _detect_format_b(pdf) -> bool:
     try:
         for page in pdf.pages[:20]:
             text = page.extract_text() or ''
-            matches = LOCATION_CODE_RE.findall(text)
-            if len(matches) >= 3:
+            if len(LOCATION_CODE_RE.findall(text)) >= 3:
                 return True
     except Exception:
         pass
     return False
 
 
-# ─── Format A — Federal Appropriation Bill ──────────────────────────────────
+def _detect_format_c(pdf) -> bool:
+    """
+    Detect Format C: project-code-level federal budget pages.
+    Sample pages 10–35; require ≥2 pages that each have 3+ project codes
+    AND contain ONGOING/NEW.
+    """
+    try:
+        total = len(pdf.pages)
+        sample = pdf.pages[10:min(36, total)] if total > 10 else pdf.pages
+        hits = 0
+        for page in sample:
+            text = page.extract_text() or ''
+            if FORMAT_C_SKIP_RE.search(text):
+                continue
+            codes = FORMAT_C_CODE_RE.findall(text)
+            if len(codes) >= 3 and TYPE_RE_C.search(text):
+                hits += 1
+                if hits >= 2:
+                    return True
+    except Exception:
+        pass
+    return False
+
+
+# ─── Format A — Federal Appropriation Bill MDA-summary pages ─────────────────
 
 MAX_PAGES_FORMAT_A = 500
 
@@ -120,14 +191,9 @@ def _parse_pdf_format_a(contents: bytes) -> pd.DataFrame:
                             first = str(row[0] or '').strip()
                             if not first or not first.split('.')[0].isdigit():
                                 continue
-                            # Columns: NO | CODE | MDA | PERSONNEL | OVERHEAD | CAPITAL | ... | TOTAL ALLOCATION
-                            # Try to grab last numeric column as total allocation
                             mda_name = str(row[2] or '').strip() if len(row) > 2 else ''
-                            # Strip everything from the first double-space+digit sequence onward
                             mda_name = re.sub(r'\s{2,}[\d,]+.*$', '', mda_name).strip()
-                            # Also strip single-space prefix numbers (fallback)
                             mda_name = re.sub(r'\s+[\d,]+.*$', '', mda_name).strip()
-                            # Skip if no meaningful text (pure-number rows)
                             if not re.search(r'[A-Za-z]{3,}', mda_name):
                                 continue
                             if len(mda_name) < 3:
@@ -151,7 +217,6 @@ def _parse_pdf_format_a(contents: bytes) -> pd.DataFrame:
                     continue
 
             if not has_tables or not rows:
-                # Fall through to pdftotext
                 return _parse_pdf_format_a_text(contents)
     except Exception as e:
         print(f"[parser] Format A pdfplumber error: {e}")
@@ -174,25 +239,18 @@ def _parse_pdf_format_a_text(contents: bytes) -> pd.DataFrame:
         tokens = stripped.split()
         if not tokens or not tokens[0].replace('.', '').isdigit():
             continue
-        # Last numeric token is total allocation
         amount_val = None
         for tok in reversed(tokens):
             v = _to_float(tok)
             if v is not None and v > 0:
                 amount_val = v
                 break
-        # MDA name: everything between token 2 and last numeric group
         if len(tokens) < 3:
             continue
-        # Work on the original line (preserves layout spacing) to strip amounts
-        # \s{2,} = two or more spaces = column separator in pdftotext -layout output
         mda_name = re.sub(r'\s{2,}[\d,]+\.?\d*.*$', '', stripped).strip()
-        # Strip any remaining leading row-number / code prefix (digit tokens at start)
         mda_name = re.sub(r'^[\d\.]+\s+[\w\d]+\s+', '', mda_name).strip()
-        # Fallback: join tokens[2:] and strip numbers from there
         if not re.search(r'[A-Za-z]{3,}', mda_name):
             mda_name = re.sub(r'\s+[\d,]+.*$', '', ' '.join(tokens[2:])).strip()
-        # Final guard: skip rows where the name contains no meaningful text
         if not re.search(r'[A-Za-z]{3,}', mda_name):
             continue
         mda_name = mda_name[:120].strip()
@@ -211,7 +269,7 @@ def _parse_pdf_format_a_text(contents: bytes) -> pd.DataFrame:
     return _finalize_df(rows)
 
 
-# ─── Format B — State Government Project-level ──────────────────────────────
+# ─── Format B — State Government project-level ───────────────────────────────
 
 def _parse_pdf_format_b(contents: bytes) -> pd.DataFrame:
     """Project-level state budget via pdftotext -layout."""
@@ -227,15 +285,15 @@ def _parse_pdf_format_b(contents: bytes) -> pd.DataFrame:
     for line in lines:
         if not line.strip():
             continue
-
-        # Skip function codes
         if FUNC_CODE_RE.match(line):
             continue
 
         has_location = bool(LOCATION_CODE_RE.search(line))
-        has_amount = bool(AMOUNT_RE.search(line))
+        has_amount   = bool(AMOUNT_RE.search(line))
         desc_candidate = _extract_description_b(line)
-        has_desc = desc_candidate is not None and len(desc_candidate) >= 15 and not desc_candidate[0].isdigit()
+        has_desc = (desc_candidate is not None
+                    and len(desc_candidate) >= 15
+                    and not desc_candidate[0].isdigit())
 
         if not in_project_section:
             if has_location and has_amount and has_desc:
@@ -243,10 +301,9 @@ def _parse_pdf_format_b(contents: bytes) -> pd.DataFrame:
             else:
                 continue
 
-        # Extract fields
-        location = _extract_location_b(line)
+        location    = _extract_location_b(line)
         amount_match = AMOUNT_RE.search(line)
-        amount_val = _to_float(amount_match.group()) if amount_match else None
+        amount_val  = _to_float(amount_match.group()) if amount_match else None
         description = _extract_description_b(line)
 
         if not description or len(description) < 5:
@@ -258,7 +315,6 @@ def _parse_pdf_format_b(contents: bytes) -> pd.DataFrame:
         if len(description) > 120:
             continue
 
-        # Normalize STATE WIDE
         if location and re.search(r'STATE\s*WIDE', location, re.I):
             location = 'State Wide'
 
@@ -272,7 +328,6 @@ def _parse_pdf_format_b(contents: bytes) -> pd.DataFrame:
             'is_mda_level': False,
         })
 
-        # Sanity check at 500 rows
         if not sanity_checked and len(rows) > 500:
             valid_loc = sum(1 for r in rows if r['location'] and len(str(r['location'])) > 3)
             if valid_loc / len(rows) < 0.05:
@@ -284,20 +339,14 @@ def _parse_pdf_format_b(contents: bytes) -> pd.DataFrame:
 
 
 def _extract_description_b(line: str) -> Optional[str]:
-    """Extract description from a Format B line."""
-    # Remove leading numeric codes
     desc = LEADING_CODE_RE.sub('', line)
-    # Cut off at first MDA code pattern
     mda_match = MDA_CODE_RE.search(desc)
     if mda_match:
         desc = desc[:mda_match.start()]
     desc = desc.strip()
-    if not desc:
-        return None
-    return desc[:120]
+    return desc[:120] if desc else None
 
 
-# Fix 3: words that indicate the matched string is a budget category, not a place name
 _LOCATION_REJECT_WORDS = {
     'MONITORING', 'EVALUATION', 'SERVICES', 'EXPENDITURE', 'RECURRENT',
     'CAPITAL', 'PERSONNEL', 'OVERHEAD', 'REVENUE', 'SECTOR', 'BUDGET',
@@ -308,7 +357,6 @@ _LOCATION_REJECT_WORDS = {
 
 
 def _extract_location_b(line: str) -> Optional[str]:
-    """Extract location code+name from Format B line, excluding financial keywords."""
     pattern = re.compile(
         r'(\d{8,11}\s*-\s*(?!CAPITAL|GRANTS|RECURRENT|REVENUE|EXPENDITURE|PERSONNEL|OVERHEAD|'
         r'PURCHASE|CONSTRUCTION|REHABILITATION|TRAINING|RESEARCH|INTERNATIONAL|LOANS|'
@@ -317,23 +365,140 @@ def _extract_location_b(line: str) -> Optional[str]:
     m = pattern.search(line)
     if not m:
         return None
-
     raw = m.group(1)
     parts = raw.split('-', 1)
     name = parts[1].strip() if len(parts) > 1 else raw.strip()
-
-    # Fix 3: discard if any reject word appears in the extracted location name
-    name_words = set(name.upper().split())
-    if name_words & _LOCATION_REJECT_WORDS:
+    if set(name.upper().split()) & _LOCATION_REJECT_WORDS:
         return None
-
     return name if name else None
 
 
-# ─── Excel / CSV ─────────────────────────────────────────────────────────────
+# ─── Format C — Federal Appropriation Bill project-level pages ───────────────
+
+def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
+    """
+    Parse Format C: project-level pages of the Federal Appropriation Bill.
+    Uses pdftotext -layout; splits output by form-feed into pages;
+    skips MDA summary pages; extracts CODE | DESCRIPTION | TYPE | AMOUNT.
+    Multi-line descriptions are folded into the previous row.
+    """
+    text = _pdftotext(contents, timeout=240)
+    if not text:
+        print("[parser] Format C: pdftotext returned no text")
+        return pd.DataFrame()
+
+    pages = text.split('\x0c')
+    rows = []
+    current_ministry = None
+
+    for page_text in pages:
+        # Skip summary / header-only pages
+        if FORMAT_C_SKIP_RE.search(page_text):
+            continue
+        # Must have at least one type keyword to be worth parsing
+        if not TYPE_RE_C.search(page_text):
+            continue
+        # Quick check for any project codes
+        if not FORMAT_C_CODE_RE.search(page_text):
+            continue
+
+        lines = page_text.splitlines()
+        prev_row = None
+
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or len(stripped) < 4:
+                continue
+
+            # ── MDA section header? ───────────────────────────────────────────
+            section_m = FORMAT_C_SECTION_RE.match(stripped)
+            if section_m:
+                current_ministry = section_m.group(2).strip()[:120]
+                prev_row = None
+                continue
+
+            # Skip decorative lines (dashes, equals, column header rows)
+            if re.match(r'^[-=\s]+$', stripped):
+                continue
+            if re.match(r'^(CODE|S/?N|TYPE|AMOUNT|PROJECT\s+NAME)\b', stripped, re.I):
+                continue
+
+            # ── Project line? ─────────────────────────────────────────────────
+            code_m = re.match(r'^([A-Z][A-Z0-9]{7,13})\s+(.*)', stripped)
+            if code_m:
+                code = code_m.group(1)
+                rest = code_m.group(2).strip()
+
+                type_m = TYPE_RE_C.search(rest)
+                if not type_m:
+                    # May be a project line without type yet (type on next line)
+                    # Treat as starting a new pending row — skip for now
+                    prev_row = None
+                    continue
+
+                type_kw   = type_m.group(1)
+                desc_part = rest[:type_m.start()].strip().rstrip('.,')
+                after     = rest[type_m.end():].strip()
+
+                # Amount: last numeric token after the type keyword
+                amount_val = None
+                for tok in reversed(after.split()):
+                    v = _to_float(tok)
+                    if v is not None and v > 0:
+                        amount_val = v
+                        break
+
+                if not desc_part or len(desc_part) < 5:
+                    prev_row = None
+                    continue
+
+                location = _extract_location_c(desc_part)
+
+                row_dict = {
+                    'row_id':        None,
+                    'description':   desc_part[:200],
+                    'amount':        amount_val,
+                    'location':      location,
+                    'ministry':      current_ministry,
+                    'project_code':  code,
+                    'is_mda_level':  False,
+                }
+                rows.append(row_dict)
+                prev_row = row_dict
+
+                if len(rows) >= MAX_ROWS_FORMAT_C:
+                    print(f"[parser] Format C: row cap {MAX_ROWS_FORMAT_C} reached")
+                    return _finalize_df(rows)
+
+                continue
+
+            # ── Continuation line? ────────────────────────────────────────────
+            # A line with no project code, no type keyword, no trailing large
+            # number, but containing letters — belongs to the previous description.
+            if (prev_row is not None
+                    and re.search(r'[A-Za-z]{3,}', stripped)
+                    and not TYPE_RE_C.search(stripped)
+                    and not re.search(r'[\d,]{5,}\s*$', stripped)
+                    and not FORMAT_C_SECTION_RE.match(stripped)):
+                cur = prev_row['description']
+                merged = (cur + ' ' + stripped)[:200]
+                prev_row['description'] = merged
+                if not prev_row['location']:
+                    prev_row['location'] = _extract_location_c(merged)
+
+    print(f"[parser] Format C: extracted {len(rows)} project rows")
+    return _finalize_df(rows)
+
+
+def _extract_location_c(description: str) -> Optional[str]:
+    """Extract a Nigerian state name from a project description."""
+    m = _NIGERIA_STATES_RE.search(description)
+    return m.group(0).title() if m else None
+
+
+# ─── Excel / CSV ──────────────────────────────────────────────────────────────
 
 def _parse_excel(contents: bytes, filename: str) -> pd.DataFrame:
-    """Auto-detect columns for Excel files."""
     try:
         name_lower = filename.lower()
         if name_lower.endswith('.xls'):
@@ -347,7 +512,6 @@ def _parse_excel(contents: bytes, filename: str) -> pd.DataFrame:
 
 
 def _parse_csv(contents: bytes) -> pd.DataFrame:
-    """Auto-detect columns for CSV files."""
     try:
         df = pd.read_csv(io.BytesIO(contents))
         return _auto_detect_columns(df)
@@ -357,13 +521,11 @@ def _parse_csv(contents: bytes) -> pd.DataFrame:
 
 
 def _auto_detect_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Map arbitrary column names to standard schema via keyword matching."""
-    col_map = {}
     cols_lower = {c: c.lower() for c in df.columns}
 
     amount_kw = ['amount', 'total', 'allocation', 'approved budget', 'total allocation', 'capital', 'overhead']
-    desc_kw = ['description', 'project', 'item', 'activity', 'mda', 'administrative unit']
-    loc_kw = ['location', 'state', 'lga', 'constituency', 'ward', 'zone']
+    desc_kw   = ['description', 'project', 'item', 'activity', 'mda', 'administrative unit']
+    loc_kw    = ['location', 'state', 'lga', 'constituency', 'ward', 'zone']
 
     def first_match(keywords):
         for kw in keywords:
@@ -373,20 +535,20 @@ def _auto_detect_columns(df: pd.DataFrame) -> pd.DataFrame:
         return None
 
     amount_col = first_match(amount_kw)
-    desc_col = first_match(desc_kw)
-    loc_col = first_match(loc_kw)
+    desc_col   = first_match(desc_kw)
+    loc_col    = first_match(loc_kw)
 
     rows = []
     for _, row in df.iterrows():
-        desc = str(row[desc_col]).strip() if desc_col else ''
+        desc       = str(row[desc_col]).strip() if desc_col else ''
         amount_val = _to_float(row[amount_col]) if amount_col else None
-        location = str(row[loc_col]).strip() if loc_col else None
+        location   = str(row[loc_col]).strip() if loc_col else None
         rows.append({
-            'row_id': None,
-            'description': desc,
-            'amount': amount_val,
-            'location': location,
-            'ministry': None,
+            'row_id':       None,
+            'description':  desc,
+            'amount':       amount_val,
+            'location':     location,
+            'ministry':     None,
             'project_code': None,
             'is_mda_level': False,
         })
@@ -394,7 +556,7 @@ def _auto_detect_columns(df: pd.DataFrame) -> pd.DataFrame:
     return _finalize_df(rows)
 
 
-# ─── Helpers ─────────────────────────────────────────────────────────────────
+# ─── Helpers ──────────────────────────────────────────────────────────────────
 
 PDFTOTEXT_PATHS = [
     'pdftotext',
@@ -405,16 +567,13 @@ PDFTOTEXT_PATHS = [
 
 
 def _find_pdftotext() -> Optional[str]:
-    """Find the pdftotext binary."""
     import shutil
     cmd = shutil.which('pdftotext')
     if cmd:
         return cmd
-    # Search nix store
     for path in PDFTOTEXT_PATHS[1:]:
         if os.path.isfile(path):
             return path
-    # Try to find in nix store dynamically
     try:
         nix = '/nix/store'
         for entry in os.listdir(nix):
@@ -427,7 +586,7 @@ def _find_pdftotext() -> Optional[str]:
     return None
 
 
-def _pdftotext(contents: bytes) -> Optional[str]:
+def _pdftotext(contents: bytes, timeout: int = 120) -> Optional[str]:
     """Run pdftotext -layout on PDF bytes, return text."""
     try:
         binary = _find_pdftotext()
@@ -439,12 +598,19 @@ def _pdftotext(contents: bytes) -> Optional[str]:
             tmp_path = tmp.name
         result = subprocess.run(
             [binary, '-layout', tmp_path, '-'],
-            capture_output=True, timeout=120
+            capture_output=True, timeout=timeout,
         )
         os.unlink(tmp_path)
         if result.returncode == 0:
             return result.stdout.decode('utf-8', errors='replace')
         print(f"[parser] pdftotext failed: {result.stderr.decode()}")
+        return None
+    except subprocess.TimeoutExpired:
+        print(f"[parser] pdftotext timed out after {timeout}s")
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
         return None
     except Exception as e:
         print(f"[parser] pdftotext error: {e}")
@@ -452,25 +618,20 @@ def _pdftotext(contents: bytes) -> Optional[str]:
 
 
 def _finalize_df(rows: list) -> pd.DataFrame:
-    """Apply post-processing: drop short descriptions, normalize NaN, assign row_id."""
+    """Post-processing: drop short descriptions, normalize NaN, assign row_id."""
     if not rows:
         return pd.DataFrame()
 
-    df = pd.DataFrame(rows, columns=['row_id', 'description', 'amount', 'location',
-                                     'ministry', 'project_code', 'is_mda_level'])
+    df = pd.DataFrame(rows, columns=[
+        'row_id', 'description', 'amount', 'location',
+        'ministry', 'project_code', 'is_mda_level',
+    ])
 
-    # Drop rows with null/short description
     df = df[df['description'].notna()]
     df = df[df['description'].str.strip().str.len() >= 5]
-
-    # Normalize NaN → None
     df = df.where(pd.notnull(df), None)
-
-    # Assign sequential row_id
     df = df.reset_index(drop=True)
     df['row_id'] = df.index + 1
-
-    # Ensure amount is numeric
     df['amount'] = pd.to_numeric(df['amount'], errors='coerce')
 
     return df

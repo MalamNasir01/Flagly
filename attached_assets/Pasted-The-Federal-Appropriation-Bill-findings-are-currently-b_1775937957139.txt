@@ -1,0 +1,25 @@
+The Federal Appropriation Bill findings are currently based only on the MDA summary (pages 1–9). The real actionable data is on pages 10–2790 which contain individual project line items in this format:
+CODE          PROJECT NAME                                    TYPE        AMOUNT
+ERGP27202188  MAINTENANCE OF BUILDING/CIVIL INFRASTRUCTURES  ONGOING     1,430,518
+ERGP27223783  PROVISION OF ACCOMMODATION AND CO-LOCATED      ONGOING     384,870,961
+              GUEST HOUSES/FURNISHING...
+This is a third budget format — call it Format C. It has these columns: CODE | PROJECT NAME (multi-line) | TYPE | AMOUNT.
+Add Format C detection and parsing to parser.py:
+Detection: Format C is detected when a page contains the pattern ^[A-Z0-9]{8,14}\s+[A-Z] (project code followed by description) AND the word "ONGOING" or "NEW" appears on the same page.
+Parsing Format C pages:
+
+Skip pages that are MDA summary pages (contain "SUMMARY BY MDAs" or "TOTAL ALLOCATION" as a column header)
+For each project line: extract CODE (first token matching [A-Z0-9]{8,14}), PROJECT NAME (everything between code and TYPE keyword), TYPE (ONGOING/NEW), AMOUNT (last number on the line)
+Multi-line descriptions: if a line has no code and no amount, it's a continuation of the previous description — append it
+Set is_mda_level = False for all Format C rows
+Location: extract from the MDA section header above each group of projects — e.g. 0111001002 STATE HOUSE OPERATIONS - PRESIDENT — use the section title as ministry, and look for state/LGA names within the project description itself
+
+Also for Format C, enable all flag engines:
+
+INFLATED AMOUNT: yes — individual project amounts should be checked
+CONTEXT MISMATCH: yes
+MISSING LOCATION: yes — flag if no state/LGA found in description
+DUPLICATE CLUSTER: yes
+GHOST PROJECT: yes
+
+After implementing Format C, re-run the Federal PDF and the results should show real project-level findings — inflated renovations, suspicious procurement amounts, duplicate project names across ministries etc.
