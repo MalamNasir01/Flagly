@@ -1,0 +1,91 @@
+Add Format C parsing and five new detection capabilities for the Federal Appropriation Bill (2,790 pages). This is the highest priority update.
+PART 1 — Format C Parser (parser.py)
+The Federal Appropriation Bill has two sections:
+
+Pages 1–9: MDA summary (already partially handled — keep as is)
+Pages 10–2790: Project-level detail — this is Format C
+
+Format C page structure:
+0234004001     FEDERAL ROAD MAINTENANCE AGENCY        ← MDA section header
+
+CODE              PROJECT NAME                    TYPE      AMOUNT
+ERGP12234385   Maintenance of Zaria-Pambeguwa     ONGOING   14,700,000,000
+               Road, Kaduna State
+ERGP12234386   Roads Rehabilitation in Selected   NEW       7,000,000,000
+               Locations in North West (Multiple
+               Locations)
+Detection: Format C is active when format_b_detected = False AND the page contains a pattern matching [A-Z]{2,4}\d{8,12} (ERGP codes) AND contains "ONGOING" or "NEW".
+Parsing rules for Format C:
+
+Track current MDA by detecting 10-digit section headers ^\d{10}\s+[A-Z] — store as current_mda_code and current_mda_name
+For each project line, extract:
+
+project_code: token matching [A-Z]{2,4}\d{8,12}
+description: everything between the code and TYPE keyword (ONGOING/NEW), including continuation lines
+status: ONGOING or NEW
+amount: last number on the line
+ministry: current_mda_name
+expenditure_code: detect from lines starting with 21 (Personnel), 22 (Overhead), 23 (Capital) — only extract Capital (23) items for red-flag analysis, skip Personnel and Overhead lines
+
+
+Multi-line descriptions: if a line has no ERGP code and no amount, append it to the previous row's description
+Set is_mda_level = False for all Format C rows
+Skip lines that are pure category headers (start with 2-digit expenditure codes like 21, 22, 23, 2101, 2202 etc.)
+
+Location extraction from description text:
+After extracting description, run these extractions:
+python# Extract Nigerian states mentioned
+NIGERIAN_STATES = ["Abia","Adamawa","Akwa Ibom","Anambra","Bauchi","Bayelsa","Benue","Borno","Cross River","Delta","Ebonyi","Edo","Ekiti","Enugu","Gombe","Imo","Jigawa","Kaduna","Kano","Katsina","Kebbi","Kogi","Kwara","Lagos","Nasarawa","Niger","Ogun","Ondo","Osun","Oyo","Plateau","Rivers","Sokoto","Taraba","Yobe","Zamfara","FCT","Abuja"]
+found_states = [s for s in NIGERIAN_STATES if s.lower() in description.lower()]
+location = ", ".join(found_states) if found_states else None
+PART 2 — Five New Flag Types (flags.py)
+Flag A — VAGUE LOCATION (new flag type)
+Fire when description contains any of: "selected locations", "multiple locations", "multiple lots", "various locations", "selected states", "various states", "nationwide", "across the country"
+
+Severity: HIGH if amount > ₦1B, MEDIUM otherwise
+Title: "Non-Traceable Location"
+Explanation: "Project description uses vague location language ('[matched phrase]'). Without specific locations, implementation cannot be tracked or verified."
+
+Flag B — BUDGET SPLITTING (new flag type)
+Detect when 3 or more items share: same MDA + similar description (85%+ match) + amounts within 5% of each other
+
+Group these as a "split cluster"
+Severity: HIGH
+Title: "Suspected Budget Splitting"
+Explanation: "Found [N] line items under [MDA] with near-identical descriptions and amounts (₦X each). This pattern is consistent with project splitting to avoid oversight thresholds."
+
+Flag C — MDA MANDATE MISMATCH (new flag type)
+Build a simple mandate map:
+pythonMANDATE_MAP = {
+    "road": ["road", "highway", "bridge", "transport", "works", "infrastructure"],
+    "health": ["health", "hospital", "medical", "clinic", "pharmaceutical"],
+    "education": ["education", "school", "university", "college", "training"],
+    "water": ["water", "irrigation", "dam", "sanitation"],
+    "agriculture": ["agriculture", "farm", "livestock", "fishery", "food"],
+}
+If MDA name belongs to one sector but project description clearly belongs to another sector (0 keyword overlap), flag as MANDATE MISMATCH.
+
+Severity: MEDIUM
+Title: "Possible Mandate Violation"
+Explanation: "[MDA name] is a [sector] agency but this project appears to be a [other sector] project. Verify this allocation is within the agency's mandate."
+
+Flag D — ENHANCED DUPLICATE with splitting detection
+Extend the existing duplicate cluster flag: if duplicate cluster members all have amounts within 10% of each other AND they are all under the same MDA, upgrade severity to HIGH and add note "Identical amounts suggest systematic splitting rather than coincidental duplication."
+Flag E — OVERHEAD DOMINANCE (Format A only)
+For MDA summary rows where OVERHEAD column > CAPITAL column AND total > ₦10B:
+
+Severity: MEDIUM
+Title: "Overhead Exceeds Capital Spending"
+Explanation: "[MDA] spent more on overhead (NGN X) than capital projects (NGN Y). This may indicate administrative costs consuming funds meant for project delivery."
+
+PART 3 — UI updates (index.html)
+Add two new filter pills: "Vague Location" and "Budget Splitting"
+Update the flag tag colours:
+
+VAGUE LOCATION: yellow/amber background
+BUDGET SPLITTING: bright red background, bold
+MANDATE MISMATCH: purple background
+
+In the detail modal, for BUDGET SPLITTING flags show a mini-table listing all the split items with their codes and amounts side by side.
+PART 4 — PDF report (index.html)
+Add a new section to the report between Duplicate Clusters and Inflated Amounts: "Budget Splitting & Mandate Issues" — list all BUDGET_SPLITTING and MANDATE_MISMATCH flags here with full details.

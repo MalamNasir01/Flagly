@@ -214,11 +214,23 @@ tbody td { padding: 12px 14px; font-size: 12px; vertical-align: middle; }
 
 .flag-tags { display: flex; flex-wrap: wrap; gap: 3px; }
 .flag-tag { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.04em; white-space: nowrap; }
-.flag-tag.INFLATED_AMOUNT { background: rgba(232,52,28,0.13); color: var(--accent); }
-.flag-tag.CONTEXT_MISMATCH { background: rgba(245,158,11,0.13); color: var(--amber); }
-.flag-tag.MISSING_LOCATION { background: rgba(59,130,246,0.13); color: var(--blue); }
-.flag-tag.DUPLICATE_CLUSTER { background: rgba(168,85,247,0.13); color: #a855f7; }
-.flag-tag.GHOST_PROJECT { background: rgba(236,72,153,0.13); color: #ec4899; }
+.flag-tag.INFLATED_AMOUNT    { background: rgba(232,52,28,0.13);  color: var(--accent); }
+.flag-tag.CONTEXT_MISMATCH   { background: rgba(245,158,11,0.13); color: var(--amber); }
+.flag-tag.MISSING_LOCATION   { background: rgba(59,130,246,0.13); color: var(--blue); }
+.flag-tag.DUPLICATE_CLUSTER  { background: rgba(168,85,247,0.13); color: #a855f7; }
+.flag-tag.GHOST_PROJECT      { background: rgba(236,72,153,0.13); color: #ec4899; }
+.flag-tag.VAGUE_LOCATION     { background: rgba(245,158,11,0.22); color: #d97706; }
+.flag-tag.BUDGET_SPLITTING   { background: rgba(232,52,28,0.28);  color: var(--accent); font-weight: 900; letter-spacing: 0.06em; }
+.flag-tag.MANDATE_MISMATCH   { background: rgba(168,85,247,0.22); color: #7c3aed; }
+.flag-tag.OVERHEAD_DOMINANCE { background: rgba(59,130,246,0.22); color: #2563eb; }
+
+/* Split items mini-table inside modal */
+.split-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:11px; }
+.split-table th { text-align:left; padding:4px 8px; font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--border); }
+.split-table td { padding:5px 8px; border-bottom:1px solid rgba(255,255,255,0.04); color:var(--text); }
+.split-table tr:last-child td { border-bottom:none; }
+.split-table .td-code { color:var(--muted); font-family:monospace; }
+.split-table .td-amt  { font-weight:600; white-space:nowrap; }
 
 .pagination { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
 .page-btns { display: flex; gap: 5px; }
@@ -364,10 +376,13 @@ tbody td { padding: 12px 14px; font-size: 12px; vertical-align: middle; }
 
     <div class="flag-pills">
       <div class="pill" id="wrapDuplicates">Duplicate Clusters <span class="count" id="pillDuplicates">0</span></div>
+      <div class="pill" id="wrapSplitting">Budget Splitting <span class="count" id="pillSplitting">0</span></div>
       <div class="pill" id="wrapInflated">Inflated Amounts <span class="count" id="pillInflated">0</span></div>
       <div class="pill" id="wrapContext">Context Mismatch <span class="count" id="pillContext">0</span></div>
       <div class="pill" id="wrapLocation">No Location <span class="count" id="pillLocation">0</span></div>
+      <div class="pill" id="wrapVague">Vague Location <span class="count" id="pillVague">0</span></div>
       <div class="pill" id="wrapGhost">Ghost Projects <span class="count" id="pillGhost">0</span></div>
+      <div class="pill" id="wrapMandate">Mandate Mismatch <span class="count" id="pillMandate">0</span></div>
     </div>
 
     <button class="btn-pdf" onclick="downloadPDF()">⬇ Download PDF Report</button>
@@ -385,11 +400,14 @@ tbody td { padding: 12px 14px; font-size: 12px; vertical-align: middle; }
       <button class="filter-btn" data-filter="all" onclick="setFilter('all')">All</button>
       <button class="filter-btn active" data-filter="HIGH" onclick="setFilter('HIGH')">High Risk</button>
       <button class="filter-btn" data-filter="MEDIUM" onclick="setFilter('MEDIUM')">Medium Risk</button>
-      <button class="filter-btn" data-filter="DUPLICATE_CLUSTER" onclick="setFilter('DUPLICATE_CLUSTER')">Duplicate Clusters</button>
-      <button class="filter-btn" data-filter="INFLATED_AMOUNT" onclick="setFilter('INFLATED_AMOUNT')">Inflated Amounts</button>
-      <button class="filter-btn" data-filter="CONTEXT_MISMATCH" onclick="setFilter('CONTEXT_MISMATCH')">Context Mismatch</button>
-      <button class="filter-btn" data-filter="MISSING_LOCATION" onclick="setFilter('MISSING_LOCATION')">No Location</button>
-      <button class="filter-btn" data-filter="GHOST_PROJECT" onclick="setFilter('GHOST_PROJECT')">Ghost Projects</button>
+      <button class="filter-btn" data-filter="DUPLICATE_CLUSTER"  onclick="setFilter('DUPLICATE_CLUSTER')">Duplicate Clusters</button>
+      <button class="filter-btn" data-filter="BUDGET_SPLITTING"   onclick="setFilter('BUDGET_SPLITTING')">Budget Splitting</button>
+      <button class="filter-btn" data-filter="INFLATED_AMOUNT"    onclick="setFilter('INFLATED_AMOUNT')">Inflated Amounts</button>
+      <button class="filter-btn" data-filter="CONTEXT_MISMATCH"   onclick="setFilter('CONTEXT_MISMATCH')">Context Mismatch</button>
+      <button class="filter-btn" data-filter="MISSING_LOCATION"   onclick="setFilter('MISSING_LOCATION')">No Location</button>
+      <button class="filter-btn" data-filter="VAGUE_LOCATION"     onclick="setFilter('VAGUE_LOCATION')">Vague Location</button>
+      <button class="filter-btn" data-filter="GHOST_PROJECT"      onclick="setFilter('GHOST_PROJECT')">Ghost Projects</button>
+      <button class="filter-btn" data-filter="MANDATE_MISMATCH"   onclick="setFilter('MANDATE_MISMATCH')">Mandate Mismatch</button>
     </div>
 
     <div class="table-wrapper">
@@ -572,10 +590,13 @@ function renderSummary(d) {
   document.getElementById('sumAtRisk').textContent     = fmtNGN(d.at_risk_amount);
   const fs = d.flag_summary || {};
   setPill('wrapDuplicates', 'pillDuplicates', fs.duplicate_clusters || 0);
+  setPill('wrapSplitting',  'pillSplitting',  fs.budget_splitting   || 0);
   setPill('wrapInflated',   'pillInflated',   fs.inflated_amounts   || 0);
   setPill('wrapContext',    'pillContext',     fs.context_mismatch   || 0);
   setPill('wrapLocation',   'pillLocation',   fs.missing_location   || 0);
+  setPill('wrapVague',      'pillVague',       fs.vague_location     || 0);
   setPill('wrapGhost',      'pillGhost',       fs.ghost_projects     || 0);
+  setPill('wrapMandate',    'pillMandate',     fs.mandate_mismatch   || 0);
 }
 
 function fmtNGN(v) {
@@ -672,13 +693,20 @@ function renderTable() {
 }
 
 function buildTags(flags) {
+  const LABELS = {
+    'DUPLICATE_CLUSTER':  f => `DUPLICATE (${f.cluster_size}x)`,
+    'INFLATED_AMOUNT':    () => 'INFLATED',
+    'CONTEXT_MISMATCH':   () => 'MISMATCH',
+    'MISSING_LOCATION':   () => 'NO LOCATION',
+    'GHOST_PROJECT':      () => 'GHOST',
+    'VAGUE_LOCATION':     () => 'VAGUE LOC',
+    'BUDGET_SPLITTING':   () => 'SPLITTING',
+    'MANDATE_MISMATCH':   () => 'MANDATE',
+    'OVERHEAD_DOMINANCE': () => 'OVERHEAD',
+  };
   return flags.map(f => {
-    let label = f.flag_type;
-    if (f.flag_type==='DUPLICATE_CLUSTER') label = `DUPLICATE (${f.cluster_size}x)`;
-    else if (f.flag_type==='INFLATED_AMOUNT') label = 'INFLATED';
-    else if (f.flag_type==='CONTEXT_MISMATCH') label = 'MISMATCH';
-    else if (f.flag_type==='MISSING_LOCATION') label = 'NO LOCATION';
-    else if (f.flag_type==='GHOST_PROJECT') label = 'GHOST';
+    const fn = LABELS[f.flag_type];
+    const label = fn ? fn(f) : f.flag_type;
     return `<span class="flag-tag ${f.flag_type}">${label}</span>`;
   }).join('');
 }
@@ -725,16 +753,27 @@ function openModal(idx) {
     <div class="meta-item"><div class="meta-label">Ministry / MDA</div><div class="meta-value">${esc(r.ministry||'—')}</div></div>
     <div class="meta-item"><div class="meta-label">Risk Level</div><div class="meta-value"><span class="risk-badge ${r.risk_level}">${r.risk_level} (${r.risk_score})</span></div></div>
   `;
-  document.getElementById('modalFlags').innerHTML = (r.flags||[]).map(f => `
-    <div class="flag-card">
+  document.getElementById('modalFlags').innerHTML = (r.flags||[]).map(f => {
+    let body = `<div class="flag-card-body">${esc(f.explanation||'')}</div>`;
+    if (f.flag_type === 'BUDGET_SPLITTING' && Array.isArray(f.split_items) && f.split_items.length) {
+      const rows = f.split_items.map(si => `<tr>
+        <td class="td-code">${esc(si.code||'—')}</td>
+        <td>${esc((si.description||'').slice(0,55))}${(si.description||'').length > 55 ? '…' : ''}</td>
+        <td class="td-amt">${fmtNGN(si.amount)}</td>
+      </tr>`).join('');
+      body += `<table class="split-table"><thead><tr>
+        <th>CODE</th><th>DESCRIPTION</th><th>AMOUNT</th>
+      </tr></thead><tbody>${rows}</tbody></table>`;
+    }
+    return `<div class="flag-card">
       <div class="flag-card-header">
         <span class="flag-tag ${f.flag_type}">${f.flag_type.replace(/_/g,' ')}</span>
         <span class="flag-card-title">${esc(f.title||'')}</span>
         <span class="risk-badge ${f.severity}" style="margin-left:auto">${f.severity}</span>
       </div>
-      <div class="flag-card-body">${esc(f.explanation||'')}</div>
-    </div>
-  `).join('');
+      ${body}
+    </div>`;
+  }).join('');
   document.getElementById('modalBg').classList.add('open');
 }
 
@@ -880,11 +919,15 @@ function downloadPDF() {
 
   const fs = scanData.flag_summary || {};
   const fRows = [
-    ['Duplicate Clusters', fs.duplicate_clusters||0],
-    ['Inflated Amounts',   fs.inflated_amounts  ||0],
-    ['Context Mismatch',   fs.context_mismatch  ||0],
-    ['Missing Location',   fs.missing_location  ||0],
-    ['Ghost Projects',     fs.ghost_projects    ||0],
+    ['Duplicate Clusters',  fs.duplicate_clusters  ||0],
+    ['Budget Splitting',    fs.budget_splitting    ||0],
+    ['Inflated Amounts',    fs.inflated_amounts    ||0],
+    ['Context Mismatch',    fs.context_mismatch    ||0],
+    ['Missing Location',    fs.missing_location    ||0],
+    ['Vague Location',      fs.vague_location      ||0],
+    ['Ghost Projects',      fs.ghost_projects      ||0],
+    ['Mandate Mismatch',    fs.mandate_mismatch    ||0],
+    ['Overhead Dominance',  fs.overhead_dominance  ||0],
   ];
   fRows.forEach(([lbl, cnt], idx) => {
     if (idx % 2 === 0) { setFill(C.rowBg); } else { setFill(C.white); }
@@ -917,18 +960,21 @@ function downloadPDF() {
 
   footer(pn);
 
-  // ── Pages 3–8: One page per flag category ─────────────────────────────
+  // ── Pages 3+: One page per flag category ──────────────────────────────
   const cats = [
-    {key:'DUPLICATE_CLUSTER', label:'Duplicate Clusters'},
-    {key:'INFLATED_AMOUNT',   label:'Inflated Amounts'},
-    {key:'CONTEXT_MISMATCH',  label:'Context Mismatch'},
-    {key:'MISSING_LOCATION',  label:'Missing Location'},
-    {key:'GHOST_PROJECT',     label:'Ghost Projects'},
+    {key:'DUPLICATE_CLUSTER',  label:'Duplicate Clusters'},
+    {key:'BUDGET_SPLITTING',   label:'Budget Splitting & Mandate Issues', keys:['BUDGET_SPLITTING','MANDATE_MISMATCH']},
+    {key:'INFLATED_AMOUNT',    label:'Inflated Amounts'},
+    {key:'CONTEXT_MISMATCH',   label:'Context Mismatch'},
+    {key:'VAGUE_LOCATION',     label:'Vague Location'},
+    {key:'MISSING_LOCATION',   label:'Missing Location'},
+    {key:'GHOST_PROJECT',      label:'Ghost Projects'},
   ];
 
   cats.forEach(cat => {
-    if (pn >= 9) return;
-    const items = allResults.filter(r=>(r.flags||[]).some(f=>f.flag_type===cat.key)).slice(0,6);
+    if (pn >= 13) return;
+    const matchKeys = cat.keys || [cat.key];
+    const items = allResults.filter(r=>(r.flags||[]).some(f=>matchKeys.includes(f.flag_type))).slice(0,6);
     if (!items.length) return;
     doc.addPage(); pn++;
     setFill(C.white); doc.rect(0,0,W,H,'F');
@@ -991,22 +1037,37 @@ function downloadPDF() {
     {t:'Inflated Amount', b:'Each line item is compared against category-specific cost benchmarks for Nigerian infrastructure projects. Items exceeding the benchmark trigger this flag. Recommended action: Cross-reference with the Bill of Quantities (BOQ) and current market rates for the project type. File a Freedom of Information request for procurement records.'},
     {t:'Context Mismatch', b:'Flags items where the amount is grossly disproportionate for the category even though it falls below ₦1 billion. Recommended action: Request an itemised breakdown and supporting procurement documents from the relevant MDA.'},
     {t:'Missing Location', b:'Capital expenditure above ₦5M with no attached LGA, ward, or constituency is flagged. Without a physical location, independent verification of delivery is impossible. Recommended action: File an FOI request for project implementation and geo-tagged evidence.'},
+    {t:'Vague Location', b:'Items whose location field contains only generic placeholders such as "various states", "nationwide", or "TBD" are flagged. Generic locations prevent independent verification of project delivery. Recommended action: Request geo-tagged implementation evidence from the MDA.'},
     {t:'Duplicate Cluster', b:'Descriptions with ≥95% similarity are grouped as duplicate clusters. Legitimate budgets may repeat similar items at different locations, but identical descriptions at the same location are suspicious. Recommended action: Verify that each clustered project is at a genuinely distinct location with unique beneficiaries.'},
+    {t:'Budget Splitting', b:'Three or more items from the same MDA with ≥85% similar descriptions and amounts within 5% of each other are flagged as suspected artificial splits designed to avoid single-contract procurement thresholds. Recommended action: File an FOI request for the award history of all related contracts.'},
     {t:'Ghost Project', b:'Descriptions referencing a year 2+ years before the current budget year indicate potentially recycled or unimplemented projects. These may be rolled-over items presented as new appropriations. Recommended action: File a performance audit request with the Auditor-General\'s office.'},
+    {t:'Mandate Mismatch', b:'Items whose activity category does not align with the procuring MDA\'s stated sector mandate are flagged. Procurement outside an MDA\'s mandate may indicate misappropriation or procurement fraud. Recommended action: Request the enabling instrument or procurement plan from the MDA.'},
+    {t:'Overhead Dominance', b:'For MDAs with total budgets exceeding ₦10 billion, cases where overhead (running costs) exceeds capital expenditure are flagged. Overhead-heavy MDAs may be prioritising staff costs over public service delivery. Recommended action: Obtain the detailed personnel cost breakdown and compare with payroll records.'},
   ];
 
+  const newMethodPage = () => {
+    footer(pn);
+    doc.addPage(); pn++;
+    setFill(C.white); doc.rect(0,0,W,H,'F');
+    setFill(C.red); doc.rect(0,0,W,8,'F');
+    doc.setFontSize(8); doc.setFont('helvetica','bold'); setCol(C.white);
+    doc.text('UDEME Budget Red-Flag Scan Report · ' + yr, M, 5.5);
+    my = 16;
+  };
   methods.forEach(m => {
-    if (my > H - 40) return;
     doc.setFont('helvetica','bold'); doc.setFontSize(9); setCol(C.red);
+    const ls = doc.splitTextToSize(m.b, CW);
+    const needed = 5 + ls.length * 4.5 + 8 + 4;
+    if (my + needed > H - 26) newMethodPage();
     doc.text(m.t, M, my);
     setDraw(C.divider); doc.setLineWidth(0.3); doc.line(M, my+1.5, M+CW, my+1.5);
     my += 5;
     doc.setFont('helvetica','normal'); doc.setFontSize(8); setCol(C.body);
-    const ls = doc.splitTextToSize(m.b, CW);
     doc.text(ls, M, my);
     my += ls.length * 4.5 + 8;
   });
 
+  if (my + 28 > H) newMethodPage();
   // Disclaimer
   setFill(C.rowBg); setDraw(C.border); doc.setLineWidth(0.3);
   doc.roundedRect(M, my+4, CW, 20, 2, 2, 'FD');

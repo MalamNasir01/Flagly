@@ -24,13 +24,16 @@ YEAR_IN_DESC_RE    = re.compile(r'\b(19|20)\d{2}\b')
 
 # ─── Format C regex constants ─────────────────────────────────────────────────
 
-# Project code: starts with a letter, 8-14 uppercase alphanum chars
-FORMAT_C_CODE_RE = re.compile(r'^([A-Z][A-Z0-9]{7,13})\s+(.+)', re.MULTILINE)
+# Project code: 2-4 uppercase letters + 8-12 digits (e.g. ERGP12234385, NIP00123456)
+FORMAT_C_CODE_RE = re.compile(r'^([A-Z]{2,4}\d{8,12})\s+(.+)', re.MULTILINE)
 
-# MDA section header on a Format C page: 10-14 digit code followed by a name
+# MDA section header: exactly 10-digit code followed by MDA name
 FORMAT_C_SECTION_RE = re.compile(
-    r'^(\d{10,14})\s{1,6}([A-Z][A-Z0-9\s/\-&,.()\[\]]{4,100})$'
+    r'^(\d{10})\s{1,6}([A-Z][A-Z0-9\s/\-&,.()\[\]]{4,100})$'
 )
+
+# Expenditure-type lines: 21xx Personnel, 22xx Overhead, 23xx Capital sub-breakdowns
+EXPENDITURE_CODE_RE = re.compile(r'^(21|22|23)\d{0,4}\s')
 
 # Pages that are MDA summary pages — skip entirely
 FORMAT_C_SKIP_RE = re.compile(
@@ -204,14 +207,20 @@ def _parse_pdf_format_a(contents: bytes) -> pd.DataFrame:
                                 if v is not None and v > 0:
                                     amount_val = v
                                     break
+                            # Best-effort: Federal budget table layout is
+                            # NO | CODE | MDA | PERSONNEL | OVERHEAD | CAPITAL | TOTAL
+                            overhead_val = _to_float(row[4]) if len(row) >= 7 else None
+                            capital_val  = _to_float(row[5]) if len(row) >= 7 else None
                             rows.append({
-                                'row_id': None,
-                                'description': mda_name,
-                                'amount': amount_val,
-                                'location': mda_name,
-                                'ministry': mda_name,
-                                'project_code': str(row[1] or '').strip() if len(row) > 1 else None,
-                                'is_mda_level': True,
+                                'row_id':          None,
+                                'description':     mda_name,
+                                'amount':          amount_val,
+                                'location':        mda_name,
+                                'ministry':        mda_name,
+                                'project_code':    str(row[1] or '').strip() if len(row) > 1 else None,
+                                'is_mda_level':    True,
+                                'overhead_amount': overhead_val,
+                                'capital_amount':  capital_val,
                             })
                 except Exception:
                     continue
@@ -390,6 +399,7 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
     pages = text.split('\x0c')
     rows = []
     current_ministry = None
+    current_mda_code = None
 
     for page_text in pages:
         # Skip summary / header-only pages
@@ -413,18 +423,21 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
             # ── MDA section header? ───────────────────────────────────────────
             section_m = FORMAT_C_SECTION_RE.match(stripped)
             if section_m:
+                current_mda_code = section_m.group(1).strip()
                 current_ministry = section_m.group(2).strip()[:120]
                 prev_row = None
                 continue
 
-            # Skip decorative lines (dashes, equals, column header rows)
+            # Skip decorative lines, column headers, expenditure code lines
             if re.match(r'^[-=\s]+$', stripped):
                 continue
             if re.match(r'^(CODE|S/?N|TYPE|AMOUNT|PROJECT\s+NAME)\b', stripped, re.I):
                 continue
+            if EXPENDITURE_CODE_RE.match(stripped):
+                continue  # Skip Personnel (21xx), Overhead (22xx), Capital (23xx) sub-lines
 
             # ── Project line? ─────────────────────────────────────────────────
-            code_m = re.match(r'^([A-Z][A-Z0-9]{7,13})\s+(.*)', stripped)
+            code_m = re.match(r'^([A-Z]{2,4}\d{8,12})\s+(.*)', stripped)
             if code_m:
                 code = code_m.group(1)
                 rest = code_m.group(2).strip()
@@ -491,9 +504,16 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
 
 
 def _extract_location_c(description: str) -> Optional[str]:
-    """Extract a Nigerian state name from a project description."""
-    m = _NIGERIA_STATES_RE.search(description)
-    return m.group(0).title() if m else None
+    """Extract all Nigerian state names from a project description, joined by ', '."""
+    found = []
+    seen: set = set()
+    for m in _NIGERIA_STATES_RE.finditer(description):
+        name = m.group(0).title()
+        key  = name.lower()
+        if key not in seen:
+            seen.add(key)
+            found.append(name)
+    return ', '.join(found) if found else None
 
 
 # ─── Excel / CSV ──────────────────────────────────────────────────────────────
@@ -622,10 +642,18 @@ def _finalize_df(rows: list) -> pd.DataFrame:
     if not rows:
         return pd.DataFrame()
 
-    df = pd.DataFrame(rows, columns=[
+    all_cols = [
         'row_id', 'description', 'amount', 'location',
         'ministry', 'project_code', 'is_mda_level',
-    ])
+        'overhead_amount', 'capital_amount',
+    ]
+    # Only keep columns that are present in the data
+    present_cols = [c for c in all_cols if any(c in r for r in rows)]
+    for r in rows:
+        for c in all_cols:
+            r.setdefault(c, None)
+
+    df = pd.DataFrame(rows, columns=all_cols)
 
     df = df[df['description'].notna()]
     df = df[df['description'].str.strip().str.len() >= 5]

@@ -126,11 +126,15 @@ async def scan(
                 "at_risk_amount": 0,
                 "total_amount": total_amount,
                 "flag_summary": {
-                    "duplicate_clusters": 0,
-                    "inflated_amounts": 0,
-                    "context_mismatch": 0,
-                    "missing_location": 0,
-                    "ghost_projects": 0,
+                    "duplicate_clusters":  0,
+                    "inflated_amounts":    0,
+                    "context_mismatch":    0,
+                    "missing_location":    0,
+                    "ghost_projects":      0,
+                    "vague_location":      0,
+                    "budget_splitting":    0,
+                    "mandate_mismatch":    0,
+                    "overhead_dominance":  0,
                 },
                 "results": [],
             })
@@ -146,11 +150,15 @@ async def scan(
         at_risk_amount = sum(safe_float(r.get("amount") or 0) for r in results)
 
         flag_summary = {
-            "duplicate_clusters": 0,
-            "inflated_amounts": 0,
-            "context_mismatch": 0,
-            "missing_location": 0,
-            "ghost_projects": 0,
+            "duplicate_clusters":  0,
+            "inflated_amounts":    0,
+            "context_mismatch":    0,
+            "missing_location":    0,
+            "ghost_projects":      0,
+            "vague_location":      0,
+            "budget_splitting":    0,
+            "mandate_mismatch":    0,
+            "overhead_dominance":  0,
         }
         for r in results:
             seen_types = set()
@@ -168,6 +176,14 @@ async def scan(
                         flag_summary["missing_location"] += 1
                     elif ft == "GHOST_PROJECT":
                         flag_summary["ghost_projects"] += 1
+                    elif ft == "VAGUE_LOCATION":
+                        flag_summary["vague_location"] += 1
+                    elif ft == "BUDGET_SPLITTING":
+                        flag_summary["budget_splitting"] += 1
+                    elif ft == "MANDATE_MISMATCH":
+                        flag_summary["mandate_mismatch"] += 1
+                    elif ft == "OVERHEAD_DOMINANCE":
+                        flag_summary["overhead_dominance"] += 1
 
         return json_response({
             "total_items": total_items,

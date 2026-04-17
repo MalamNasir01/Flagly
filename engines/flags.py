@@ -1,7 +1,9 @@
 """
 flags.py — Red-flag detection engine for UDEME Budget Scanner
-Five flag types: INFLATED_AMOUNT, CONTEXT_MISMATCH, MISSING_LOCATION,
-                  DUPLICATE_CLUSTER, GHOST_PROJECT
+Flag types:
+  INFLATED_AMOUNT, CONTEXT_MISMATCH, MISSING_LOCATION,
+  DUPLICATE_CLUSTER, GHOST_PROJECT,
+  VAGUE_LOCATION, BUDGET_SPLITTING, MANDATE_MISMATCH, OVERHEAD_DOMINANCE
 """
 
 import re
@@ -10,10 +12,9 @@ from typing import List, Dict, Optional
 from rapidfuzz import fuzz
 
 
-# ─── Helpers ─────────────────────────────────────────────────────────────────
+# ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def _is_null_amount(val) -> bool:
-    """True if val is None, NaN, or Inf."""
     if val is None:
         return True
     try:
@@ -24,34 +25,32 @@ def _is_null_amount(val) -> bool:
 
 
 def _fmt_amount(val) -> str:
-    """Format amount as 'NGN X' or 'an unspecified amount' if null."""
     if _is_null_amount(val):
         return 'an unspecified amount'
     return f'NGN {float(val):,.0f}'
 
 
-# ─── Category benchmarks ─────────────────────────────────────────────────────
+# ─── Category benchmarks ──────────────────────────────────────────────────────
 
 CATEGORY_BENCHMARKS = [
     (['road', 'highway', 'carriageway'], 3_000_000_000),
-    (['bridge'], 3_000_000_000),
-    (['school', 'classroom'], 600_000_000),
-    (['hospital', 'health centre'], 3_000_000_000),
-    (['clinic', 'primary health'], 600_000_000),
-    (['borehole', 'water supply'], 60_000_000),
-    (['toilet', 'sanitation'], 30_000_000),
-    (['renovation', 'remodel'], 300_000_000),
-    (['furniture'], 150_000_000),
-    (['vehicle', 'equipment'], 150_000_000),
-    (['training', 'capacity'], 60_000_000),
-    (['printing', 'publication'], 30_000_000),
-    (['consultancy', 'study'], 300_000_000),
-    (['empowerment', 'grant'], 300_000_000),
+    (['bridge'],                          3_000_000_000),
+    (['school', 'classroom'],              600_000_000),
+    (['hospital', 'health centre'],      3_000_000_000),
+    (['clinic', 'primary health'],         600_000_000),
+    (['borehole', 'water supply'],          60_000_000),
+    (['toilet', 'sanitation'],              30_000_000),
+    (['renovation', 'remodel'],            300_000_000),
+    (['furniture'],                        150_000_000),
+    (['vehicle', 'equipment'],             150_000_000),
+    (['training', 'capacity'],              60_000_000),
+    (['printing', 'publication'],           30_000_000),
+    (['consultancy', 'study'],             300_000_000),
+    (['empowerment', 'grant'],             300_000_000),
 ]
 
 FALLBACK_THRESHOLD = 1_000_000_000
 
-# Fix 4 — only flag MISSING_LOCATION for physical/deliverable project types
 PHYSICAL_PROJECT_KEYWORDS = [
     'construction', 'rehabilitation', 'renovation', 'procurement', 'supply',
     'establishment', 'provision', 'installation', 'repair',
@@ -59,7 +58,6 @@ PHYSICAL_PROJECT_KEYWORDS = [
 
 
 def _match_category(description: str):
-    """Return (keywords_label, threshold) or None if no match."""
     if not description:
         return None
     desc_lower = description.lower()
@@ -71,16 +69,15 @@ def _match_category(description: str):
 
 
 def _has_physical_project_keyword(description: str) -> bool:
-    """True if description suggests a physical/deliverable project."""
     desc_lower = (description or '').lower()
     return any(kw in desc_lower for kw in PHYSICAL_PROJECT_KEYWORDS)
 
 
-# ─── Flag 1: INFLATED_AMOUNT ─────────────────────────────────────────────────
+# ─── Flag 1: INFLATED_AMOUNT ──────────────────────────────────────────────────
 
 def flag_inflated_amount(row: Dict) -> Optional[Dict]:
     if row.get('is_mda_level'):
-        return None  # Never flag MDA-level budget totals
+        return None
     amount = row.get('amount')
     description = row.get('description', '') or ''
     if _is_null_amount(amount):
@@ -116,18 +113,18 @@ def flag_inflated_amount(row: Dict) -> Optional[Dict]:
     return None
 
 
-# ─── Flag 2: CONTEXT_MISMATCH ────────────────────────────────────────────────
+# ─── Flag 2: CONTEXT_MISMATCH ─────────────────────────────────────────────────
 
 def flag_context_mismatch(row: Dict) -> Optional[Dict]:
     if row.get('is_mda_level'):
-        return None  # Never flag MDA-level budget totals
+        return None
     amount = row.get('amount')
     description = row.get('description', '') or ''
     if _is_null_amount(amount):
         return None
     amount = float(amount)
     if amount >= 1_000_000_000:
-        return None  # INFLATED_AMOUNT handles ≥1B
+        return None
 
     cat = _match_category(description)
     if not cat:
@@ -147,7 +144,7 @@ def flag_context_mismatch(row: Dict) -> Optional[Dict]:
     return None
 
 
-# ─── Flag 3: MISSING_LOCATION ────────────────────────────────────────────────
+# ─── Flag 3: MISSING_LOCATION ─────────────────────────────────────────────────
 
 SKIP_LOCATIONS = {'state wide', 'various', 'national', 'nationwide', 'federal'}
 
@@ -155,9 +152,7 @@ SKIP_LOCATIONS = {'state wide', 'various', 'national', 'nationwide', 'federal'}
 def flag_missing_location(row: Dict) -> Optional[Dict]:
     if row.get('is_mda_level'):
         return None
-
     description = row.get('description', '') or ''
-    # Fix 4: only fire for physical/deliverable project types
     if not _has_physical_project_keyword(description):
         return None
 
@@ -171,7 +166,7 @@ def flag_missing_location(row: Dict) -> Optional[Dict]:
     loc_lower = loc_str.lower()
 
     if loc_str and len(loc_str) > 3 and loc_lower not in SKIP_LOCATIONS:
-        return None  # Has valid location
+        return None
 
     severity = 'HIGH' if amount > 100_000_000 else 'MEDIUM'
     return {
@@ -186,7 +181,7 @@ def flag_missing_location(row: Dict) -> Optional[Dict]:
     }
 
 
-# ─── Flag 4: DUPLICATE_CLUSTER ───────────────────────────────────────────────
+# ─── Flag 4: DUPLICATE_CLUSTER ────────────────────────────────────────────────
 
 DUPLICATE_ACTION_VERBS = {
     'construction', 'rehabilitation', 'renovation', 'procurement', 'supply',
@@ -197,7 +192,6 @@ DUPLICATE_ACTION_VERBS = {
 
 
 def _has_action_verb(description: str) -> bool:
-    """True if description contains at least one project action verb."""
     desc_lower = description.lower()
     return any(v in desc_lower for v in DUPLICATE_ACTION_VERBS)
 
@@ -205,9 +199,9 @@ def _has_action_verb(description: str) -> bool:
 def flag_duplicates(rows: List[Dict]) -> List[Dict]:
     """
     Group rows by description similarity ≥95% into clusters.
-    Only compare descriptions ≥40 chars, not starting with a digit,
-    and containing at least one project action verb.
-    Returns modified rows list with DUPLICATE_CLUSTER flags added.
+    Only compare descriptions ≥40 chars with at least one action verb.
+    Flag D enhancement: if cluster members have amounts within 10% of each other
+    AND all under the same MDA, upgrade severity to HIGH and note systematic splitting.
     """
     candidates = [
         r for r in rows
@@ -228,8 +222,7 @@ def flag_duplicates(rows: List[Dict]) -> List[Dict]:
         for j, row_b in enumerate(candidates):
             if i == j or id(row_b) in visited:
                 continue
-            score = fuzz.ratio(row_a['description'], row_b['description'])
-            if score >= 95:
+            if fuzz.ratio(row_a['description'], row_b['description']) >= 95:
                 cluster.append(row_b)
                 visited.add(id(row_b))
         if len(cluster) >= 2:
@@ -239,7 +232,33 @@ def flag_duplicates(rows: List[Dict]) -> List[Dict]:
         n = len(cluster)
         cluster_row_ids = [r.get('row_id') for r in cluster]
 
-        # Fix 2: prefer highest non-null amount; fall back to longest description
+        # Flag D: detect systematic splitting
+        amounts_raw = [r.get('amount') for r in cluster]
+        all_have_amount = all(not _is_null_amount(a) for a in amounts_raw)
+        amounts = [float(a) for a in amounts_raw if not _is_null_amount(a)]
+        mdas = {(r.get('ministry') or '').strip() for r in cluster}
+        all_same_mda = len(mdas) == 1 and any(mdas)
+
+        amounts_close = False
+        if all_have_amount and len(amounts) >= 2:
+            mean_amt = sum(amounts) / len(amounts)
+            if mean_amt > 0:
+                max_diff = max(abs(a - mean_amt) / mean_amt for a in amounts)
+                amounts_close = max_diff <= 0.10
+
+        is_systematic = amounts_close and all_same_mda and n >= 3
+
+        explanation = f'This project description appears {n} times across the budget. '
+        if is_systematic:
+            explanation += (
+                'Identical amounts suggest systematic splitting rather than coincidental '
+                'duplication. '
+            )
+        explanation += (
+            'Verify these are genuinely separate projects at different locations '
+            'and not the same allocation duplicated.'
+        )
+
         members_with_amount = [r for r in cluster if not _is_null_amount(r.get('amount'))]
         if members_with_amount:
             representative = max(members_with_amount, key=lambda r: float(r['amount']))
@@ -250,19 +269,14 @@ def flag_duplicates(rows: List[Dict]) -> List[Dict]:
             'flag_type': 'DUPLICATE_CLUSTER',
             'cluster_size': n,
             'matched_rows': cluster_row_ids,
-            'severity': 'HIGH' if n > 5 else 'MEDIUM',
+            'severity': 'HIGH' if (is_systematic or n > 5) else 'MEDIUM',
             'title': f'Duplicate Cluster ({n}x)',
-            'explanation': (
-                f'This project description appears {n} times across the budget. '
-                f'Verify these are genuinely separate projects at different locations '
-                f'and not the same allocation duplicated.'
-            ),
+            'explanation': explanation,
         }
 
         representative.setdefault('_flags', []).append(flag)
         representative['cluster_size'] = n
 
-        # Mark all other members for exclusion
         for member in cluster:
             if member is not representative:
                 member['_exclude'] = True
@@ -272,9 +286,6 @@ def flag_duplicates(rows: List[Dict]) -> List[Dict]:
 
 # ─── Flag 5: GHOST_PROJECT ────────────────────────────────────────────────────
 
-# Only match years that appear in a budget-year context — preceded/followed by
-# indicators like FY, BATCH, BUDGET, a closing paren, or a dash.
-# This prevents matching ₦2,015 amounts or "EDUCATION 2030 FORA" programme names.
 YEAR_RE = re.compile(
     r'(?<!\d)(201[0-9]|202[0-4])(?!\d)'
     r'(?=\s*[\)\-]|\s+(?:BUDGET|APPROPRIATION|FY|FISCAL|BATCH|EDITION|PHASE|TRANCHE|CONTRACT))',
@@ -290,7 +301,6 @@ def flag_ghost_project(row: Dict, all_descriptions: List[str], budget_year: Opti
     except ValueError:
         return None
 
-    # Minimum amount guard: avoid matching ₦2,015 / ₦2,030 "amounts" as years
     amount = row.get('amount')
     if not _is_null_amount(amount) and float(amount) < 1_000_000:
         return None
@@ -301,7 +311,6 @@ def flag_ghost_project(row: Dict, all_descriptions: List[str], budget_year: Opti
     if not stale_years:
         return None
 
-    # Also check if same description appears in other rows with old years
     for other_desc in all_descriptions:
         if other_desc == description:
             continue
@@ -330,21 +339,213 @@ def flag_ghost_project(row: Dict, all_descriptions: List[str], budget_year: Opti
     }
 
 
-# ─── Main runner ─────────────────────────────────────────────────────────────
+# ─── Flag A: VAGUE_LOCATION ───────────────────────────────────────────────────
+
+VAGUE_LOCATION_PHRASES = [
+    'selected locations', 'multiple locations', 'multiple lots',
+    'various locations', 'selected states', 'various states',
+    'nationwide', 'across the country', 'various places', 'multiple sites',
+    'different locations', 'different states', 'selected areas',
+]
+
+
+def flag_vague_location(row: Dict) -> Optional[Dict]:
+    if row.get('is_mda_level'):
+        return None
+    description = (row.get('description') or '').lower()
+    amount = row.get('amount')
+
+    matched = next((p for p in VAGUE_LOCATION_PHRASES if p in description), None)
+    if not matched:
+        return None
+
+    severity = 'MEDIUM'
+    if not _is_null_amount(amount) and float(amount) > 1_000_000_000:
+        severity = 'HIGH'
+
+    return {
+        'flag_type': 'VAGUE_LOCATION',
+        'severity': severity,
+        'title': 'Non-Traceable Location',
+        'explanation': (
+            f'Project description uses vague location language ("{matched}"). '
+            f'Without specific locations, implementation cannot be tracked or verified.'
+        ),
+    }
+
+
+# ─── Flag B: BUDGET_SPLITTING ─────────────────────────────────────────────────
+
+def flag_budget_splitting(rows: List[Dict]) -> List[Dict]:
+    """
+    Detect ≥3 items under the same MDA with ≥85% similar descriptions and
+    amounts within 5% of each other. Flags ALL members (no exclusion).
+    """
+    by_mda: Dict[str, List[Dict]] = {}
+    for row in rows:
+        if row.get('is_mda_level') or row.get('_exclude'):
+            continue
+        ministry = (row.get('ministry') or '').strip()
+        if not ministry:
+            continue
+        by_mda.setdefault(ministry, []).append(row)
+
+    for ministry, mda_rows in by_mda.items():
+        candidates = [
+            r for r in mda_rows
+            if not _is_null_amount(r.get('amount'))
+            and len(r.get('description') or '') >= 20
+        ]
+        if len(candidates) < 3:
+            continue
+
+        visited_split: set = set()
+
+        for i, seed in enumerate(candidates):
+            if id(seed) in visited_split:
+                continue
+            amt_seed = float(seed['amount'])
+            if amt_seed == 0:
+                continue
+
+            group = [seed]
+            for j, other in enumerate(candidates):
+                if i == j or id(other) in visited_split:
+                    continue
+                if fuzz.ratio(seed['description'], other['description']) < 85:
+                    continue
+                amt_other = float(other['amount'])
+                if amt_other == 0:
+                    continue
+                if abs(amt_seed - amt_other) / max(amt_seed, amt_other) > 0.05:
+                    continue
+                group.append(other)
+
+            if len(group) >= 3:
+                for r in group:
+                    visited_split.add(id(r))
+
+                n = len(group)
+                avg_amt = sum(float(r['amount']) for r in group) / n
+                split_items = [
+                    {
+                        'code':        r.get('project_code') or '—',
+                        'description': (r.get('description') or '')[:70],
+                        'amount':      r.get('amount'),
+                    }
+                    for r in group
+                ]
+                flag = {
+                    'flag_type':  'BUDGET_SPLITTING',
+                    'severity':   'HIGH',
+                    'title':      'Suspected Budget Splitting',
+                    'explanation': (
+                        f'Found {n} line items under {ministry} with near-identical descriptions '
+                        f'and amounts ({_fmt_amount(avg_amt)} each). This pattern is consistent '
+                        f'with project splitting to avoid oversight thresholds.'
+                    ),
+                    'split_items': split_items,
+                }
+                for r in group:
+                    r.setdefault('_flags', []).append(flag)
+
+    return rows
+
+
+# ─── Flag C: MANDATE_MISMATCH ─────────────────────────────────────────────────
+
+MANDATE_MAP = {
+    'road':        ['road', 'highway', 'bridge', 'transport', 'works', 'infrastructure'],
+    'health':      ['health', 'hospital', 'medical', 'clinic', 'pharmaceutical'],
+    'education':   ['education', 'school', 'university', 'college', 'training'],
+    'water':       ['water', 'irrigation', 'dam', 'sanitation'],
+    'agriculture': ['agriculture', 'farm', 'livestock', 'fishery', 'food'],
+}
+
+
+def _classify_sector(text: str) -> Optional[str]:
+    if not text:
+        return None
+    text_lower = text.lower()
+    for sector, keywords in MANDATE_MAP.items():
+        if any(kw in text_lower for kw in keywords):
+            return sector
+    return None
+
+
+def flag_mandate_mismatch(row: Dict) -> Optional[Dict]:
+    if row.get('is_mda_level'):
+        return None
+    ministry = (row.get('ministry') or '').strip()
+    description = (row.get('description') or '').strip()
+    if not ministry or not description:
+        return None
+
+    mda_sector  = _classify_sector(ministry)
+    proj_sector = _classify_sector(description)
+
+    if not mda_sector or not proj_sector or mda_sector == proj_sector:
+        return None
+
+    return {
+        'flag_type': 'MANDATE_MISMATCH',
+        'severity':  'MEDIUM',
+        'title':     'Possible Mandate Violation',
+        'explanation': (
+            f'{ministry} is a {mda_sector} agency but this project appears to be a '
+            f'{proj_sector} project. Verify this allocation is within the agency\'s mandate.'
+        ),
+    }
+
+
+# ─── Flag E: OVERHEAD_DOMINANCE ───────────────────────────────────────────────
+
+def flag_overhead_dominance(row: Dict) -> Optional[Dict]:
+    """Only fires for Format A MDA-level rows that have overhead and capital extracted."""
+    if not row.get('is_mda_level'):
+        return None
+
+    overhead = row.get('overhead_amount')
+    capital  = row.get('capital_amount')
+    amount   = row.get('amount')
+
+    if _is_null_amount(overhead) or _is_null_amount(capital):
+        return None
+    if _is_null_amount(amount) or float(amount) <= 10_000_000_000:
+        return None
+
+    overhead = float(overhead)
+    capital  = float(capital)
+
+    if overhead <= capital:
+        return None
+
+    mda_name = row.get('description') or row.get('ministry') or 'This MDA'
+    return {
+        'flag_type': 'OVERHEAD_DOMINANCE',
+        'severity':  'MEDIUM',
+        'title':     'Overhead Exceeds Capital Spending',
+        'explanation': (
+            f'{mda_name} spent more on overhead ({_fmt_amount(overhead)}) than capital '
+            f'projects ({_fmt_amount(capital)}). This may indicate administrative costs '
+            f'consuming funds meant for project delivery.'
+        ),
+    }
+
+
+# ─── Main runner ──────────────────────────────────────────────────────────────
 
 def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
-    """
-    Run all flag checks and return list of flagged item dicts.
-    """
+    """Run all flag checks and return list of flagged item dicts."""
     rows = df.to_dict('records')
 
-    # Attach empty flags list and init fields
     for row in rows:
-        row['_flags'] = []
+        row['_flags']   = []
         row['_exclude'] = False
 
-    # Flags 1, 2, 3, 5 — per-item
     all_descriptions = [r.get('description', '') or '' for r in rows]
+
+    # Per-row flags
     for row in rows:
         f1 = flag_inflated_amount(row)
         if f1:
@@ -362,10 +563,23 @@ def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
         if f5:
             row['_flags'].append(f5)
 
-    # Flag 4 — cluster-based (modifies rows in-place)
-    rows = flag_duplicates(rows)
+        fa = flag_vague_location(row)
+        if fa:
+            row['_flags'].append(fa)
 
-    # Build final result: only flagged, non-excluded rows
+        fc = flag_mandate_mismatch(row)
+        if fc:
+            row['_flags'].append(fc)
+
+        fe = flag_overhead_dominance(row)
+        if fe:
+            row['_flags'].append(fe)
+
+    # Batch flags (modify rows in-place)
+    rows = flag_duplicates(rows)
+    rows = flag_budget_splitting(rows)
+
+    # Build final result: only flagged non-excluded rows
     results = []
     for row in rows:
         if row.get('_exclude'):
@@ -374,17 +588,16 @@ def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
         if not flags:
             continue
 
-        result = {
-            'row_id': row.get('row_id'),
-            'description': row.get('description'),
-            'amount': row.get('amount'),
-            'location': row.get('location'),
-            'ministry': row.get('ministry'),
+        results.append({
+            'row_id':       row.get('row_id'),
+            'description':  row.get('description'),
+            'amount':       row.get('amount'),
+            'location':     row.get('location'),
+            'ministry':     row.get('ministry'),
             'project_code': row.get('project_code'),
             'is_mda_level': row.get('is_mda_level'),
             'cluster_size': row.get('cluster_size'),
-            'flags': flags,
-        }
-        results.append(result)
+            'flags':        flags,
+        })
 
     return results
