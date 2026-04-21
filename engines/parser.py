@@ -369,17 +369,19 @@ def _extract_location_b(line: str) -> Optional[str]:
     pattern = re.compile(
         r'(\d{8,11}\s*-\s*(?!CAPITAL|GRANTS|RECURRENT|REVENUE|EXPENDITURE|PERSONNEL|OVERHEAD|'
         r'PURCHASE|CONSTRUCTION|REHABILITATION|TRAINING|RESEARCH|INTERNATIONAL|LOANS|'
-        r'DOMESTIC|EXTERNAL|BONDS|BORROWING|FINANCING|AIDS|DONOR)[A-Z][A-Z\s]{2,30})'
+        r'DOMESTIC|EXTERNAL|BONDS|BORROWING|FINANCING|AIDS|DONOR)[A-Z][A-Z\s]{2,})'
     )
-    m = pattern.search(line)
-    if not m:
-        return None
-    raw = m.group(1)
-    parts = raw.split('-', 1)
-    name = parts[1].strip() if len(parts) > 1 else raw.strip()
-    if set(name.upper().split()) & _LOCATION_REJECT_WORDS:
-        return None
-    return name if name else None
+    for m in reversed(list(pattern.finditer(line))):
+        raw = m.group(1)
+        parts = raw.split('-', 1)
+        name = parts[1].strip() if len(parts) > 1 else raw.strip()
+        name = re.sub(r'\s{2,}.*$', '', name).strip()
+        if not name:
+            continue
+        if set(name.upper().split()) & _LOCATION_REJECT_WORDS:
+            continue
+        return name
+    return None
 
 
 # ─── Format C — Federal Appropriation Bill project-level pages ───────────────

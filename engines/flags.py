@@ -146,7 +146,10 @@ def flag_context_mismatch(row: Dict) -> Optional[Dict]:
 
 # ─── Flag 3: MISSING_LOCATION ─────────────────────────────────────────────────
 
-SKIP_LOCATIONS = {'state wide', 'various', 'national', 'nationwide', 'federal'}
+BROAD_VALID_LOCATION_RE = re.compile(
+    r'\b(STATE\s+WIDE|NATIONWIDE|ACROSS\s+THE\s+STATE)\b',
+    re.IGNORECASE,
+)
 
 
 def flag_missing_location(row: Dict) -> Optional[Dict]:
@@ -165,7 +168,10 @@ def flag_missing_location(row: Dict) -> Optional[Dict]:
     loc_str = str(location).strip() if location else ''
     loc_lower = loc_str.lower()
 
-    if loc_str and len(loc_str) > 3 and loc_lower not in SKIP_LOCATIONS:
+    if BROAD_VALID_LOCATION_RE.search(loc_str) or BROAD_VALID_LOCATION_RE.search(description):
+        return None
+
+    if loc_str and len(loc_str) > 3:
         return None
 
     severity = 'HIGH' if amount > 100_000_000 else 'MEDIUM'
