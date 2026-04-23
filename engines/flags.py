@@ -548,13 +548,22 @@ def flag_duplicates_composite(rows: List[Dict]) -> List[Dict]:
     All group members are flagged (no exclusion — every instance is suspect).
     """
     from collections import defaultdict
+
+    def _valid_composite_key(row):
+        """Return composite key string only when all three codes are well-formed digits."""
+        mda = str(row.get('mda_code') or '').strip()
+        eco = str(row.get('economic_code') or '').strip()
+        loc = str(row.get('location_code') or '').strip()
+        if (len(mda) == 12 and mda.isdigit() and
+                len(eco) == 8 and eco.isdigit() and
+                len(loc) == 8 and loc.isdigit()):
+            return f'{mda}|{eco}|{loc}'
+        return None  # any code missing or malformed — no key assigned
+
     key_groups: Dict[str, List[Dict]] = defaultdict(list)
     for row in rows:
-        mda = str(row.get('mda_code') or '')
-        eco = str(row.get('economic_code') or '')
-        loc = str(row.get('location_code') or '')
-        key = f'{mda}|{eco}|{loc}'
-        if '||' in key:   # at least two codes missing — skip
+        key = _valid_composite_key(row)
+        if key is None:
             continue
         key_groups[key].append(row)
 
@@ -685,7 +694,7 @@ def flag_zero_implementation_rollover(row: Dict) -> Optional[Dict]:
     b25 = float(budget_2025)
     p25 = float(perf_2025)
     b26 = float(budget_2026)
-    if not (p25 == 0 and b25 > 50_000_000 and b26 > 0):
+    if not (p25 == 0 and b25 > 10_000_000 and b26 > 10_000_000):
         return None
     return {
         'flag_type':   'ZERO_ROLLOVER',
