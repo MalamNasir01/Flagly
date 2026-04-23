@@ -146,14 +146,13 @@ def _detect_format_b(pdf) -> bool:
 def _detect_format_c(pdf) -> bool:
     """
     Detect Format C: project-code-level federal budget pages.
-    Sample pages 10–35; require ≥2 pages that each have 3+ project codes
-    AND contain ONGOING/NEW.
+    Sample pages 10–60; return True on the first page that has ≥1 ERGP-style
+    project code AND contains ONGOING/NEW.  One qualifying page is conclusive.
     """
     try:
         total = len(pdf.pages)
         print(f"[diag] _detect_format_c: total pages={total}")
-        sample = pdf.pages[10:min(36, total)] if total > 10 else pdf.pages
-        hits = 0
+        sample = pdf.pages[10:min(61, total)] if total > 10 else pdf.pages
         for i, page in enumerate(sample):
             page_num = (10 if total > 10 else 0) + i
             text = page.extract_text() or ''
@@ -163,11 +162,9 @@ def _detect_format_c(pdf) -> bool:
             has_type = bool(TYPE_RE_C.search(text))
             if codes or has_type:
                 print(f"[diag]   page {page_num}: codes={len(codes)}  has_type={has_type}  first_code={codes[0] if codes else None}")
-            if len(codes) >= 3 and has_type:
-                hits += 1
-                print(f"[diag]   → hit #{hits} on page {page_num}")
-                if hits >= 2:
-                    return True
+            if len(codes) >= 1 and has_type:
+                print(f"[diag]   → FORMAT C confirmed on page {page_num}")
+                return True
     except Exception as e:
         print(f"[diag] _detect_format_c exception: {e}")
     return False
