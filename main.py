@@ -135,6 +135,11 @@ async def scan(
                     "budget_splitting":    0,
                     "mandate_mismatch":    0,
                     "overhead_dominance":  0,
+                    "composite_duplicate": 0,
+                    "inflated_projection": 0,
+                    "phantom_spending":    0,
+                    "vague_high_value":    0,
+                    "zero_rollover":       0,
                 },
                 "results": [],
             })
@@ -159,6 +164,27 @@ async def scan(
             "budget_splitting":    0,
             "mandate_mismatch":    0,
             "overhead_dominance":  0,
+            "composite_duplicate": 0,
+            "inflated_projection": 0,
+            "phantom_spending":    0,
+            "vague_high_value":    0,
+            "zero_rollover":       0,
+        }
+        _FLAG_MAP = {
+            "DUPLICATE_CLUSTER":    "duplicate_clusters",
+            "INFLATED_AMOUNT":      "inflated_amounts",
+            "CONTEXT_MISMATCH":     "context_mismatch",
+            "MISSING_LOCATION":     "missing_location",
+            "GHOST_PROJECT":        "ghost_projects",
+            "VAGUE_LOCATION":       "vague_location",
+            "BUDGET_SPLITTING":     "budget_splitting",
+            "MANDATE_MISMATCH":     "mandate_mismatch",
+            "OVERHEAD_DOMINANCE":   "overhead_dominance",
+            "COMPOSITE_DUPLICATE":  "composite_duplicate",
+            "INFLATED_PROJECTION":  "inflated_projection",
+            "PHANTOM_SPENDING":     "phantom_spending",
+            "VAGUE_HIGH_VALUE_SPEND": "vague_high_value",
+            "ZERO_ROLLOVER":        "zero_rollover",
         }
         for r in results:
             seen_types = set()
@@ -166,24 +192,9 @@ async def scan(
                 ft = f.get("flag_type", "")
                 if ft not in seen_types:
                     seen_types.add(ft)
-                    if ft == "DUPLICATE_CLUSTER":
-                        flag_summary["duplicate_clusters"] += 1
-                    elif ft == "INFLATED_AMOUNT":
-                        flag_summary["inflated_amounts"] += 1
-                    elif ft == "CONTEXT_MISMATCH":
-                        flag_summary["context_mismatch"] += 1
-                    elif ft == "MISSING_LOCATION":
-                        flag_summary["missing_location"] += 1
-                    elif ft == "GHOST_PROJECT":
-                        flag_summary["ghost_projects"] += 1
-                    elif ft == "VAGUE_LOCATION":
-                        flag_summary["vague_location"] += 1
-                    elif ft == "BUDGET_SPLITTING":
-                        flag_summary["budget_splitting"] += 1
-                    elif ft == "MANDATE_MISMATCH":
-                        flag_summary["mandate_mismatch"] += 1
-                    elif ft == "OVERHEAD_DOMINANCE":
-                        flag_summary["overhead_dominance"] += 1
+                    key = _FLAG_MAP.get(ft)
+                    if key:
+                        flag_summary[key] += 1
 
         return json_response({
             "total_items": total_items,

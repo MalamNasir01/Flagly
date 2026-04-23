@@ -31,6 +31,12 @@ FORMAT_C_CODE_RE = re.compile(r'^([A-Z]{2,6}\d{8,12})\s+(.+)', re.MULTILINE)
 ERGP_CODE_RE   = re.compile(r'\b([A-Z]{2,6}\d{8,12})\b')
 STATE_CODE_RE  = re.compile(r'\b(\d{12,14})\b')
 
+# Format B (Niger State) — four per-row code extractors
+MDA_CODE_B_RE      = re.compile(r'\b(\d{12})\b')
+ECONOMIC_CODE_B_RE = re.compile(r'\b(2[123]\d{6})\b')
+FUNCTION_CODE_B_RE = re.compile(r'\b(7\d{4})\b')
+LOCATION_CODE_B_RE = re.compile(r'\b(1[0-9]\d{6})\b')
+
 # MDA section header: exactly 10-digit code followed by MDA name
 FORMAT_C_SECTION_RE = re.compile(
     r'^(\d{10})\s{1,6}([A-Z][A-Z0-9\s/\-&,.()\[\]]{4,100})$'
@@ -320,9 +326,16 @@ def _parse_pdf_format_b(contents: bytes) -> pd.DataFrame:
                 continue
 
         location    = _extract_location_b(line)
-        amount_match = AMOUNT_RE.search(line)
-        amount_val  = _to_float(amount_match.group()) if amount_match else None
         description = _extract_description_b(line)
+
+        # Extract all decimal amounts; assign positionally (last = 2026 approved)
+        amounts_found = AMOUNT_RE.findall(line)
+        amounts_vals  = [_to_float(a) for a in amounts_found]
+        amount_val       = amounts_vals[-1]  if amounts_vals           else None
+        actuals_2024     = amounts_vals[0]   if len(amounts_vals) >= 4 else None
+        budget_2025      = amounts_vals[1]   if len(amounts_vals) >= 4 else None
+        performance_2025 = amounts_vals[2]   if len(amounts_vals) >= 4 else None
+        budget_2026      = amounts_vals[-1]  if amounts_vals           else None
 
         if not description or len(description) < 5:
             continue
@@ -336,15 +349,35 @@ def _parse_pdf_format_b(contents: bytes) -> pd.DataFrame:
         if location and re.search(r'STATE\s*WIDE', location, re.I):
             location = 'State Wide'
 
-        state_code_m = STATE_CODE_RE.search(line)
+        # Extract the four structural codes from the raw line
+        mda_m  = MDA_CODE_B_RE.search(line)
+        eco_m  = ECONOMIC_CODE_B_RE.search(line)
+        func_m = FUNCTION_CODE_B_RE.search(line)
+        loc_m  = LOCATION_CODE_B_RE.search(line)
+
+        mda_code_val      = mda_m.group(1)  if mda_m  else None
+        economic_code_val = eco_m.group(1)  if eco_m  else None
+        function_code_val = func_m.group(1) if func_m else None
+        location_code_val = loc_m.group(1)  if loc_m  else None
+
         rows.append({
-            'row_id': None,
-            'description': description,
-            'amount': amount_val,
-            'location': location,
-            'ministry': None,
-            'project_code': state_code_m.group(1) if state_code_m else None,
-            'is_mda_level': False,
+            'row_id':          None,
+            'description':     description,
+            'amount':          amount_val,
+            'location':        location,
+            'ministry':        None,
+            'project_code':    mda_code_val,  # MDA code is the primary identifier for Format B
+            'is_mda_level':    False,
+            # Format B structural codes
+            'mda_code':        mda_code_val,
+            'economic_code':   economic_code_val,
+            'function_code':   function_code_val,
+            'location_code':   location_code_val,
+            # Year-over-year budget fields
+            'actuals_2024':    actuals_2024,
+            'budget_2025':     budget_2025,
+            'performance_2025': performance_2025,
+            'budget_2026':     budget_2026,
         })
 
         if not sanity_checked and len(rows) > 500:
@@ -677,9 +710,11 @@ def _finalize_df(rows: list) -> pd.DataFrame:
         'row_id', 'description', 'amount', 'location',
         'ministry', 'project_code', 'is_mda_level',
         'overhead_amount', 'capital_amount',
+        # Format B structural codes
+        'mda_code', 'economic_code', 'function_code', 'location_code',
+        # Format B year-over-year amounts
+        'actuals_2024', 'budget_2025', 'performance_2025', 'budget_2026',
     ]
-    # Only keep columns that are present in the data
-    present_cols = [c for c in all_cols if any(c in r for r in rows)]
     for r in rows:
         for c in all_cols:
             r.setdefault(c, None)
@@ -691,6 +726,9 @@ def _finalize_df(rows: list) -> pd.DataFrame:
     df = df.where(pd.notnull(df), None)
     df = df.reset_index(drop=True)
     df['row_id'] = df.index + 1
-    df['amount'] = pd.to_numeric(df['amount'], errors='coerce')
+
+    for num_col in ['amount', 'overhead_amount', 'capital_amount',
+                    'actuals_2024', 'budget_2025', 'performance_2025', 'budget_2026']:
+        df[num_col] = pd.to_numeric(df[num_col], errors='coerce')
 
     return df

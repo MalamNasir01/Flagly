@@ -539,6 +539,166 @@ def flag_overhead_dominance(row: Dict) -> Optional[Dict]:
     }
 
 
+# ─── Flag 6: COMPOSITE_DUPLICATE (Format B exact key matching) ────────────────
+
+def flag_duplicates_composite(rows: List[Dict]) -> List[Dict]:
+    """
+    Format B: exact composite key match on mda_code + economic_code + location_code.
+    Same MDA + Same Economic Code + Same Location = definitive duplicate.
+    All group members are flagged (no exclusion — every instance is suspect).
+    """
+    from collections import defaultdict
+    key_groups: Dict[str, List[Dict]] = defaultdict(list)
+    for row in rows:
+        mda = str(row.get('mda_code') or '')
+        eco = str(row.get('economic_code') or '')
+        loc = str(row.get('location_code') or '')
+        key = f'{mda}|{eco}|{loc}'
+        if '||' in key:   # at least two codes missing — skip
+            continue
+        key_groups[key].append(row)
+
+    for key, group in key_groups.items():
+        if len(group) < 2:
+            continue
+        n = len(group)
+        amounts = [float(r['amount']) for r in group if not _is_null_amount(r.get('amount'))]
+        total_amount = sum(amounts)
+        mda_part, eco_part, loc_part = key.split('|', 2)
+
+        severity = 'HIGH' if (n >= 3 or total_amount > 100_000_000) else 'MEDIUM'
+        explanation = (
+            f'MDA {mda_part} allocated economic code {eco_part} spending at location '
+            f'{loc_part} {n} times. Total double-allocated amount: {_fmt_amount(total_amount)}.'
+        )
+        cluster_row_ids = [r.get('row_id') for r in group]
+        flag = {
+            'flag_type':    'COMPOSITE_DUPLICATE',
+            'severity':     severity,
+            'title':        f'Composite Duplicate ({n}×)',
+            'explanation':  explanation,
+            'cluster_size': n,
+            'matched_rows': cluster_row_ids,
+        }
+        for member in group:
+            member.setdefault('_flags', []).append(flag)
+            member['cluster_size'] = n
+
+    return rows
+
+
+# ─── Flag 7: INFLATED_PROJECTION ──────────────────────────────────────────────
+
+def flag_inflated_projection(row: Dict) -> Optional[Dict]:
+    """Budget doubled YoY with zero prior-year implementation — Format B only."""
+    budget_2026 = row.get('budget_2026')
+    budget_2025 = row.get('budget_2025')
+    perf_2025   = row.get('performance_2025')
+    if _is_null_amount(budget_2026) or _is_null_amount(budget_2025) or _is_null_amount(perf_2025):
+        return None
+    b26 = float(budget_2026)
+    b25 = float(budget_2025)
+    p25 = float(perf_2025)
+    if b25 <= 0 or b26 <= 0:
+        return None
+    if not (b26 > b25 * 2 and p25 == 0):
+        return None
+    ratio = b26 / b25
+    severity = 'HIGH' if b26 > 100_000_000 else 'MEDIUM'
+    return {
+        'flag_type':   'INFLATED_PROJECTION',
+        'severity':    severity,
+        'title':       'Inflated Projection',
+        'explanation': (
+            f'2026 allocation of {_fmt_amount(b26)} is {ratio:.1f}× the 2025 budget of '
+            f'{_fmt_amount(b25)}, but 2025 performance was zero. This project was not '
+            f'implemented last year yet received a larger allocation.'
+        ),
+    }
+
+
+# ─── Flag 8: PHANTOM_SPENDING ─────────────────────────────────────────────────
+
+_PHANTOM_KEYWORDS = ['construction', 'renovation', 'supply', 'purchase',
+                     'procurement', 'rehabilitation']
+
+
+def flag_phantom_spending(row: Dict) -> Optional[Dict]:
+    """Economic code R&D (23050101) but description indicates physical project."""
+    economic_code = str(row.get('economic_code') or '')
+    if not economic_code.startswith('23050101'):
+        return None
+    description = (row.get('description') or '').lower()
+    matched = next((kw for kw in _PHANTOM_KEYWORDS if kw in description), None)
+    if not matched:
+        return None
+    return {
+        'flag_type':   'PHANTOM_SPENDING',
+        'severity':    'MEDIUM',
+        'title':       'Economic Code Mismatch',
+        'explanation': (
+            f'This item is coded as Research & Development (23050101) but the description '
+            f'suggests it is a {matched} project. Miscoding may be used to obscure the '
+            f'nature of spending.'
+        ),
+    }
+
+
+# ─── Flag 9: VAGUE_HIGH_VALUE_SPEND ───────────────────────────────────────────
+
+def flag_vague_high_value_spend(row: Dict) -> Optional[Dict]:
+    """Capital expenditure allocated statewide (location 12642600) > ₦500M."""
+    if row.get('is_mda_level'):
+        return None
+    location_code = str(row.get('location_code') or '')
+    if location_code != '12642600':
+        return None
+    economic_code = str(row.get('economic_code') or '')
+    if not economic_code.startswith('23'):
+        return None
+    amount = row.get('amount')
+    if _is_null_amount(amount) or float(amount) <= 500_000_000:
+        return None
+    return {
+        'flag_type':   'VAGUE_HIGH_VALUE_SPEND',
+        'severity':    'MEDIUM',
+        'title':       'Vague High-Value Capital Spend',
+        'explanation': (
+            f'Capital expenditure of {_fmt_amount(float(amount))} is allocated statewide '
+            f'(location code 12642600) with no specific delivery location. High-value '
+            f'capital projects should have traceable implementation sites.'
+        ),
+    }
+
+
+# ─── Flag 10: ZERO_ROLLOVER ───────────────────────────────────────────────────
+
+def flag_zero_implementation_rollover(row: Dict) -> Optional[Dict]:
+    """Zero prior-year implementation despite significant budget — Format B only."""
+    if row.get('is_mda_level'):
+        return None
+    budget_2025 = row.get('budget_2025')
+    perf_2025   = row.get('performance_2025')
+    budget_2026 = row.get('budget_2026')
+    if _is_null_amount(budget_2025) or _is_null_amount(perf_2025) or _is_null_amount(budget_2026):
+        return None
+    b25 = float(budget_2025)
+    p25 = float(perf_2025)
+    b26 = float(budget_2026)
+    if not (p25 == 0 and b25 > 50_000_000 and b26 > 0):
+        return None
+    return {
+        'flag_type':   'ZERO_ROLLOVER',
+        'severity':    'MEDIUM',
+        'title':       'Zero Implementation Rollover',
+        'explanation': (
+            f'This project had {_fmt_amount(b25)} budgeted in 2025 but recorded zero '
+            f'implementation. The allocation has been rolled over to 2026 without evidence '
+            f'of delivery.'
+        ),
+    }
+
+
 # ─── Main runner ──────────────────────────────────────────────────────────────
 
 def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
@@ -549,40 +709,58 @@ def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
         row['_flags']   = []
         row['_exclude'] = False
 
+    # Detect Format B (Niger State): has mda_code values
+    is_format_b = (
+        'mda_code' in df.columns
+        and df['mda_code'].notna().any()
+    )
+
     all_descriptions = [r.get('description', '') or '' for r in rows]
 
-    # Per-row flags
+    # Per-row flags — universal
     for row in rows:
         f1 = flag_inflated_amount(row)
-        if f1:
-            row['_flags'].append(f1)
+        if f1: row['_flags'].append(f1)
 
         f2 = flag_context_mismatch(row)
-        if f2:
-            row['_flags'].append(f2)
+        if f2: row['_flags'].append(f2)
 
         f3 = flag_missing_location(row)
-        if f3:
-            row['_flags'].append(f3)
+        if f3: row['_flags'].append(f3)
 
         f5 = flag_ghost_project(row, all_descriptions, budget_year)
-        if f5:
-            row['_flags'].append(f5)
+        if f5: row['_flags'].append(f5)
 
         fa = flag_vague_location(row)
-        if fa:
-            row['_flags'].append(fa)
+        if fa: row['_flags'].append(fa)
 
         fc = flag_mandate_mismatch(row)
-        if fc:
-            row['_flags'].append(fc)
+        if fc: row['_flags'].append(fc)
 
         fe = flag_overhead_dominance(row)
-        if fe:
-            row['_flags'].append(fe)
+        if fe: row['_flags'].append(fe)
+
+        # Per-row flags — Format B only
+        if is_format_b:
+            f6 = flag_inflated_projection(row)
+            if f6: row['_flags'].append(f6)
+
+            f7 = flag_phantom_spending(row)
+            if f7: row['_flags'].append(f7)
+
+            f8 = flag_vague_high_value_spend(row)
+            if f8: row['_flags'].append(f8)
+
+            f9 = flag_zero_implementation_rollover(row)
+            if f9: row['_flags'].append(f9)
 
     # Batch flags (modify rows in-place)
-    rows = flag_duplicates(rows)
+    if is_format_b:
+        # Exact composite key matching replaces fuzzy duplicate detection for Format B
+        rows = flag_duplicates_composite(rows)
+    else:
+        rows = flag_duplicates(rows)
+
     rows = flag_budget_splitting(rows)
 
     # Build final result: only flagged non-excluded rows
@@ -595,15 +773,24 @@ def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
             continue
 
         results.append({
-            'row_id':       row.get('row_id'),
-            'description':  row.get('description'),
-            'amount':       row.get('amount'),
-            'location':     row.get('location'),
-            'ministry':     row.get('ministry'),
-            'project_code': row.get('project_code'),
-            'is_mda_level': row.get('is_mda_level'),
-            'cluster_size': row.get('cluster_size'),
-            'flags':        flags,
+            'row_id':          row.get('row_id'),
+            'description':     row.get('description'),
+            'amount':          row.get('amount'),
+            'location':        row.get('location'),
+            'ministry':        row.get('ministry'),
+            'project_code':    row.get('project_code'),
+            'is_mda_level':    row.get('is_mda_level'),
+            'cluster_size':    row.get('cluster_size'),
+            'flags':           flags,
+            # Format B passthrough fields
+            'mda_code':        row.get('mda_code'),
+            'economic_code':   row.get('economic_code'),
+            'function_code':   row.get('function_code'),
+            'location_code':   row.get('location_code'),
+            'actuals_2024':    row.get('actuals_2024'),
+            'budget_2025':     row.get('budget_2025'),
+            'performance_2025': row.get('performance_2025'),
+            'budget_2026':     row.get('budget_2026'),
         })
 
     return results

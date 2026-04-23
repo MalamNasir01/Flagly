@@ -1,0 +1,80 @@
+Critical architecture update based on insider knowledge of the Niger State budget structure. Each line item carries 4 codes simultaneously that form a unique fingerprint. Update the parser and flag engines to use these properly.
+PART 1 — Update parser.py to extract all 4 codes per row
+For Format B (Niger State), each line has this structure:
+[DESCRIPTION] | [MDA_CODE - MDA_NAME] | [ECONOMIC_CODE - ECONOMIC_NAME] | [FUNCTION_CODE - FUNCTION_NAME] | [LOCATION_CODE - LOCATION_NAME] | [amounts...]
+Currently we only extract description, location and amount. Update _pdftotext_fallback to also extract:
+
+mda_code: 12-digit number e.g. 056900100100 — regex \b(\d{12})\b
+economic_code: 8-digit number e.g. 23010122 — regex \b(2[123]\d{6})\b (starts with 21/22/23)
+function_code: 5-digit number e.g. 70741 — regex \b(7\d{4})\b
+location_code: 8-digit number e.g. 12642600 — regex \b(1[0-9]\d{6})\b
+
+Store all four in the DataFrame as separate columns: mda_code, economic_code, function_code, location_code
+Also extract the year-over-year columns where present — the Niger State budget has: 2024 Full Year Actuals | 2025 Revised Budget | 2025 Performance | 2026 Approved Budget. Store as actuals_2024, budget_2025, performance_2025, budget_2026. The primary amount field should remain budget_2026.
+PART 2 — Replace fuzzy duplicate detection with composite key matching (flags.py)
+Remove the current rapidfuzz text similarity duplicate engine entirely for Format B. Replace with exact composite key matching:
+pythondef flag_duplicates_composite(df):
+    # Build composite key
+    df['composite_key'] = (
+        df['mda_code'].fillna('') + '|' +
+        df['economic_code'].fillna('') + '|' +
+        df['location_code'].fillna('')
+    )
+    # Find keys appearing more than once
+    key_counts = df['composite_key'].value_counts()
+    duplicate_keys = key_counts[key_counts > 1].index
+    # Group into clusters
+    clusters = []
+    for key in duplicate_keys:
+        if '||' in key:  # skip rows with all empty codes
+            continue
+        members = df[df['composite_key'] == key]
+        clusters.append({
+            'key': key,
+            'size': len(members),
+            'rows': members['row_id'].tolist(),
+            'total_amount': members['amount'].sum(),
+            'description': members.iloc[0]['description']
+        })
+    return clusters
+This is exact — no false positives, no missed duplicates. Same MDA + Same Economic Code + Same Location = definitive duplicate.
+PART 3 — Add 5 new precision flag detections (flags.py)
+Flag 1 — INFLATED PROJECTION
+Fire when budget_2026 > (budget_2025 * 2) AND performance_2025 == 0 AND budget_2025 > 0
+
+Means: budget doubled year-over-year with zero implementation last year
+Severity: HIGH if budget_2026 > ₦100M, MEDIUM otherwise
+Explanation: "2026 allocation of NGN X is [N]x the 2025 budget of NGN Y, but 2025 performance was zero. This project was not implemented last year yet received a larger allocation."
+
+Flag 2 — PHANTOM SPENDING (Economic Code Mismatch)
+Fire when economic_code starts with 23050101 (Research & Development) but description contains keywords: construction, renovation, supply, purchase, procurement, rehabilitation
+
+Severity: MEDIUM
+Explanation: "This item is coded as Research & Development (23050101) but the description suggests it is a [construction/procurement] project. Miscoding may be used to obscure the nature of spending."
+
+Flag 3 — COMPOSITE DUPLICATE (exact key match)
+Use the composite key engine from Part 2. When a key appears 2+ times:
+
+Severity: HIGH if same key appears 3+ times or total amount > ₦100M
+Severity: MEDIUM if appears exactly twice
+Explanation: "MDA [code] allocated [economic category] spending at location [location] [N] times. Total double-allocated amount: NGN X."
+
+Flag 4 — VAGUE HIGH-VALUE SPEND
+Fire when location_code == 12642600 (STATE WIDE) AND amount > ₦500,000,000 AND economic code starts with 23 (capital expenditure)
+
+Severity: MEDIUM
+Explanation: "Capital expenditure of NGN X is allocated statewide with no specific location. High-value capital projects should have traceable delivery locations."
+
+Flag 5 — ZERO IMPLEMENTATION ROLLOVER
+Fire when performance_2025 == 0 AND budget_2025 > ₦50,000,000 AND budget_2026 > 0
+
+Severity: MEDIUM
+Explanation: "This project had NGN X budgeted in 2025 but recorded zero implementation. The allocation has been rolled over to 2026 without evidence of delivery."
+
+PART 4 — Update UI
+Add two new filter pills: "Inflated Projection" and "Zero Rollover"
+In the detail modal, show a year-over-year comparison table when these fields are available:
+| Year | Budget | Performance |
+| 2025 | ₦X | ₦0 |
+| 2026 | ₦Y | — |
+In the CODE column, display the MDA code as the primary identifier for Format B rows (it's always present). Show economic code as a secondary tag in the detail modal.

@@ -219,10 +219,24 @@ tbody td { padding: 12px 14px; font-size: 12px; vertical-align: middle; }
 .flag-tag.MISSING_LOCATION   { background: rgba(59,130,246,0.13); color: var(--blue); }
 .flag-tag.DUPLICATE_CLUSTER  { background: rgba(168,85,247,0.13); color: #a855f7; }
 .flag-tag.GHOST_PROJECT      { background: rgba(236,72,153,0.13); color: #ec4899; }
-.flag-tag.VAGUE_LOCATION     { background: rgba(245,158,11,0.22); color: #d97706; }
-.flag-tag.BUDGET_SPLITTING   { background: rgba(232,52,28,0.28);  color: var(--accent); font-weight: 900; letter-spacing: 0.06em; }
-.flag-tag.MANDATE_MISMATCH   { background: rgba(168,85,247,0.22); color: #7c3aed; }
-.flag-tag.OVERHEAD_DOMINANCE { background: rgba(59,130,246,0.22); color: #2563eb; }
+.flag-tag.VAGUE_LOCATION        { background: rgba(245,158,11,0.22); color: #d97706; }
+.flag-tag.BUDGET_SPLITTING      { background: rgba(232,52,28,0.28);  color: var(--accent); font-weight: 900; letter-spacing: 0.06em; }
+.flag-tag.MANDATE_MISMATCH      { background: rgba(168,85,247,0.22); color: #7c3aed; }
+.flag-tag.OVERHEAD_DOMINANCE    { background: rgba(59,130,246,0.22); color: #2563eb; }
+.flag-tag.COMPOSITE_DUPLICATE   { background: rgba(168,85,247,0.30); color: #6d28d9; font-weight: 900; }
+.flag-tag.INFLATED_PROJECTION   { background: rgba(232,52,28,0.22); color: var(--accent); }
+.flag-tag.PHANTOM_SPENDING      { background: rgba(168,85,247,0.18); color: #7c3aed; }
+.flag-tag.VAGUE_HIGH_VALUE_SPEND{ background: rgba(245,158,11,0.30); color: #b45309; }
+.flag-tag.ZERO_ROLLOVER         { background: rgba(59,130,246,0.18); color: #1d4ed8; }
+
+/* Year-over-year table in modal */
+.yoy-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:11px; }
+.yoy-table th { text-align:left; padding:4px 8px; font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--border); }
+.yoy-table td { padding:5px 8px; border-bottom:1px solid rgba(255,255,255,0.04); color:var(--text); }
+.yoy-table tr:last-child td { border-bottom:none; }
+.yoy-table .td-zero { color:#ef4444; font-weight:700; }
+.yoy-table .td-amt  { font-weight:600; white-space:nowrap; }
+.meta-sub-label { font-size:9px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); margin-top:10px; margin-bottom:2px; }
 
 /* Split items mini-table inside modal */
 .split-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:11px; }
@@ -383,6 +397,8 @@ tbody td { padding: 12px 14px; font-size: 12px; vertical-align: middle; }
       <div class="pill" id="wrapVague">Vague Location <span class="count" id="pillVague">0</span></div>
       <div class="pill" id="wrapGhost">Ghost Projects <span class="count" id="pillGhost">0</span></div>
       <div class="pill" id="wrapMandate">Mandate Mismatch <span class="count" id="pillMandate">0</span></div>
+      <div class="pill" id="wrapInflatedProj">Inflated Projection <span class="count" id="pillInflatedProj">0</span></div>
+      <div class="pill" id="wrapZeroRollover">Zero Rollover <span class="count" id="pillZeroRollover">0</span></div>
     </div>
 
     <button class="btn-pdf" onclick="downloadPDF()">⬇ Download PDF Report</button>
@@ -406,8 +422,13 @@ tbody td { padding: 12px 14px; font-size: 12px; vertical-align: middle; }
       <button class="filter-btn" data-filter="CONTEXT_MISMATCH"   onclick="setFilter('CONTEXT_MISMATCH')">Context Mismatch</button>
       <button class="filter-btn" data-filter="MISSING_LOCATION"   onclick="setFilter('MISSING_LOCATION')">No Location</button>
       <button class="filter-btn" data-filter="VAGUE_LOCATION"     onclick="setFilter('VAGUE_LOCATION')">Vague Location</button>
-      <button class="filter-btn" data-filter="GHOST_PROJECT"      onclick="setFilter('GHOST_PROJECT')">Ghost Projects</button>
-      <button class="filter-btn" data-filter="MANDATE_MISMATCH"   onclick="setFilter('MANDATE_MISMATCH')">Mandate Mismatch</button>
+      <button class="filter-btn" data-filter="GHOST_PROJECT"         onclick="setFilter('GHOST_PROJECT')">Ghost Projects</button>
+      <button class="filter-btn" data-filter="MANDATE_MISMATCH"      onclick="setFilter('MANDATE_MISMATCH')">Mandate Mismatch</button>
+      <button class="filter-btn" data-filter="COMPOSITE_DUPLICATE"   onclick="setFilter('COMPOSITE_DUPLICATE')">Composite Duplicate</button>
+      <button class="filter-btn" data-filter="INFLATED_PROJECTION"   onclick="setFilter('INFLATED_PROJECTION')">Inflated Projection</button>
+      <button class="filter-btn" data-filter="PHANTOM_SPENDING"      onclick="setFilter('PHANTOM_SPENDING')">Phantom Spending</button>
+      <button class="filter-btn" data-filter="VAGUE_HIGH_VALUE_SPEND" onclick="setFilter('VAGUE_HIGH_VALUE_SPEND')">Vague High-Value</button>
+      <button class="filter-btn" data-filter="ZERO_ROLLOVER"         onclick="setFilter('ZERO_ROLLOVER')">Zero Rollover</button>
     </div>
 
     <div class="table-wrapper">
@@ -595,8 +616,10 @@ function renderSummary(d) {
   setPill('wrapContext',    'pillContext',     fs.context_mismatch   || 0);
   setPill('wrapLocation',   'pillLocation',   fs.missing_location   || 0);
   setPill('wrapVague',      'pillVague',       fs.vague_location     || 0);
-  setPill('wrapGhost',      'pillGhost',       fs.ghost_projects     || 0);
-  setPill('wrapMandate',    'pillMandate',     fs.mandate_mismatch   || 0);
+  setPill('wrapGhost',       'pillGhost',        fs.ghost_projects     || 0);
+  setPill('wrapMandate',     'pillMandate',      fs.mandate_mismatch   || 0);
+  setPill('wrapInflatedProj','pillInflatedProj', fs.inflated_projection|| 0);
+  setPill('wrapZeroRollover','pillZeroRollover', fs.zero_rollover      || 0);
 }
 
 function fmtNGN(v) {
@@ -694,15 +717,20 @@ function renderTable() {
 
 function buildTags(flags) {
   const LABELS = {
-    'DUPLICATE_CLUSTER':  f => `DUPLICATE (${f.cluster_size}x)`,
-    'INFLATED_AMOUNT':    () => 'INFLATED',
-    'CONTEXT_MISMATCH':   () => 'MISMATCH',
-    'MISSING_LOCATION':   () => 'NO LOCATION',
-    'GHOST_PROJECT':      () => 'GHOST',
-    'VAGUE_LOCATION':     () => 'VAGUE LOC',
-    'BUDGET_SPLITTING':   () => 'SPLITTING',
-    'MANDATE_MISMATCH':   () => 'MANDATE',
-    'OVERHEAD_DOMINANCE': () => 'OVERHEAD',
+    'DUPLICATE_CLUSTER':    f => `DUPLICATE (${f.cluster_size}x)`,
+    'INFLATED_AMOUNT':      () => 'INFLATED',
+    'CONTEXT_MISMATCH':     () => 'MISMATCH',
+    'MISSING_LOCATION':     () => 'NO LOCATION',
+    'GHOST_PROJECT':        () => 'GHOST',
+    'VAGUE_LOCATION':       () => 'VAGUE LOC',
+    'BUDGET_SPLITTING':     () => 'SPLITTING',
+    'MANDATE_MISMATCH':     () => 'MANDATE',
+    'OVERHEAD_DOMINANCE':   () => 'OVERHEAD',
+    'COMPOSITE_DUPLICATE':  f => `COMPOSITE DUP (${f.cluster_size||'?'}×)`,
+    'INFLATED_PROJECTION':  () => 'INFLATED PROJ',
+    'PHANTOM_SPENDING':     () => 'PHANTOM',
+    'VAGUE_HIGH_VALUE_SPEND': () => 'VAGUE HIGH-VAL',
+    'ZERO_ROLLOVER':        () => 'ZERO ROLLOVER',
   };
   return flags.map(f => {
     const fn = LABELS[f.flag_type];
@@ -747,11 +775,40 @@ function openModal(idx) {
   const r = filteredResults[idx];
   if (!r) return;
   document.getElementById('modalTitle').textContent = r.description || '—';
+
+  // Year-over-year table (Format B only — when YoY data is present)
+  let yoyHtml = '';
+  const hasYoY = (r.budget_2025 != null || r.performance_2025 != null || r.budget_2026 != null);
+  if (hasYoY) {
+    const p25 = r.performance_2025;
+    const zeroClass = (p25 !== null && Number(p25) === 0) ? ' class="td-zero"' : '';
+    yoyHtml = `<div class="meta-sub-label">Year-over-Year Budget</div>
+    <table class="yoy-table"><thead><tr><th>Year</th><th>Budget</th><th>Performance</th></tr></thead><tbody>
+      <tr><td>2024 Actuals</td><td class="td-amt">${fmtNGN(r.actuals_2024)}</td><td>—</td></tr>
+      <tr><td>2025</td><td class="td-amt">${fmtNGN(r.budget_2025)}</td><td${zeroClass}>${p25 !== null ? fmtNGN(p25) : '—'}</td></tr>
+      <tr><td>2026 Approved</td><td class="td-amt">${fmtNGN(r.budget_2026)}</td><td>—</td></tr>
+    </tbody></table>`;
+  }
+
+  // Economic/function code secondary tags
+  let codeHtml = '';
+  if (r.economic_code || r.function_code) {
+    codeHtml = `<div class="meta-item">
+      <div class="meta-label">Economic / Function Code</div>
+      <div class="meta-value" style="font-family:monospace;font-size:11px">
+        ${r.economic_code ? `Eco: ${esc(r.economic_code)}` : ''}
+        ${r.economic_code && r.function_code ? ' &nbsp;|&nbsp; ' : ''}
+        ${r.function_code ? `Func: ${esc(r.function_code)}` : ''}
+      </div></div>`;
+  }
+
   document.getElementById('modalMeta').innerHTML = `
-    <div class="meta-item"><div class="meta-label">Amount</div><div class="meta-value">${fmtNGNFull(r.amount)}</div></div>
+    <div class="meta-item"><div class="meta-label">Amount (2026 Approved)</div><div class="meta-value">${fmtNGNFull(r.amount)}</div></div>
     <div class="meta-item"><div class="meta-label">Location</div><div class="meta-value">${esc(r.location||'—')}</div></div>
     <div class="meta-item"><div class="meta-label">Ministry / MDA</div><div class="meta-value">${esc(r.ministry||'—')}</div></div>
+    ${codeHtml}
     <div class="meta-item"><div class="meta-label">Risk Level</div><div class="meta-value"><span class="risk-badge ${r.risk_level}">${r.risk_level} (${r.risk_score})</span></div></div>
+    ${yoyHtml}
   `;
   document.getElementById('modalFlags').innerHTML = (r.flags||[]).map(f => {
     let body = `<div class="flag-card-body">${esc(f.explanation||'')}</div>`;
@@ -928,6 +985,11 @@ function downloadPDF() {
     ['Ghost Projects',      fs.ghost_projects      ||0],
     ['Mandate Mismatch',    fs.mandate_mismatch    ||0],
     ['Overhead Dominance',  fs.overhead_dominance  ||0],
+    ['Composite Duplicate', fs.composite_duplicate ||0],
+    ['Inflated Projection', fs.inflated_projection ||0],
+    ['Phantom Spending',    fs.phantom_spending    ||0],
+    ['Vague High-Value',    fs.vague_high_value    ||0],
+    ['Zero Rollover',       fs.zero_rollover       ||0],
   ];
   fRows.forEach(([lbl, cnt], idx) => {
     if (idx % 2 === 0) { setFill(C.rowBg); } else { setFill(C.white); }
