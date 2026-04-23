@@ -24,8 +24,12 @@ YEAR_IN_DESC_RE    = re.compile(r'\b(19|20)\d{2}\b')
 
 # ─── Format C regex constants ─────────────────────────────────────────────────
 
-# Project code: 2-4 uppercase letters + 8-12 digits (e.g. ERGP12234385, NIP00123456)
-FORMAT_C_CODE_RE = re.compile(r'^([A-Z]{2,4}\d{8,12})\s+(.+)', re.MULTILINE)
+# Project code: 2-6 uppercase letters + 8-12 digits (e.g. ERGP12234385, NIP00123456)
+FORMAT_C_CODE_RE = re.compile(r'^([A-Z]{2,6}\d{8,12})\s+(.+)', re.MULTILINE)
+
+# Reusable code extractors shared across formats
+ERGP_CODE_RE   = re.compile(r'\b([A-Z]{2,6}\d{8,12})\b')
+STATE_CODE_RE  = re.compile(r'\b(\d{12,14})\b')
 
 # MDA section header: exactly 10-digit code followed by MDA name
 FORMAT_C_SECTION_RE = re.compile(
@@ -265,13 +269,14 @@ def _parse_pdf_format_a_text(contents: bytes) -> pd.DataFrame:
         mda_name = mda_name[:120].strip()
         if len(mda_name) < 3:
             continue
+        code_m = ERGP_CODE_RE.search(stripped)
         rows.append({
             'row_id': None,
             'description': mda_name,
             'amount': amount_val,
             'location': mda_name,
             'ministry': mda_name,
-            'project_code': tokens[1] if len(tokens) > 1 else None,
+            'project_code': code_m.group(1) if code_m else None,
             'is_mda_level': True,
         })
 
@@ -327,13 +332,14 @@ def _parse_pdf_format_b(contents: bytes) -> pd.DataFrame:
         if location and re.search(r'STATE\s*WIDE', location, re.I):
             location = 'State Wide'
 
+        state_code_m = STATE_CODE_RE.search(line)
         rows.append({
             'row_id': None,
             'description': description,
             'amount': amount_val,
             'location': location,
             'ministry': None,
-            'project_code': None,
+            'project_code': state_code_m.group(1) if state_code_m else None,
             'is_mda_level': False,
         })
 
@@ -439,7 +445,7 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
                 continue  # Skip Personnel (21xx), Overhead (22xx), Capital (23xx) sub-lines
 
             # ── Project line? ─────────────────────────────────────────────────
-            code_m = re.match(r'^([A-Z]{2,4}\d{8,12})\s+(.*)', stripped)
+            code_m = re.match(r'^([A-Z]{2,6}\d{8,12})\s+(.*)', stripped)
             if code_m:
                 code = code_m.group(1)
                 rest = code_m.group(2).strip()
