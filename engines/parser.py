@@ -445,29 +445,34 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
                 continue  # Skip Personnel (21xx), Overhead (22xx), Capital (23xx) sub-lines
 
             # ── Project line? ─────────────────────────────────────────────────
-            code_m = re.match(r'^([A-Z]{2,6}\d{8,12})\s+(.*)', stripped)
+            # Code is always the first token: 2-6 uppercase letters + 8-12 digits
+            code_m = re.match(r'^([A-Z]{2,6}\d{8,12})\s+', stripped)
             if code_m:
-                code = code_m.group(1)
-                rest = code_m.group(2).strip()
+                code      = code_m.group(1)
+                remainder = stripped[code_m.end():]
 
-                type_m = TYPE_RE_C.search(rest)
-                if not type_m:
-                    # May be a project line without type yet (type on next line)
-                    # Treat as starting a new pending row — skip for now
-                    prev_row = None
-                    continue
-
-                type_kw   = type_m.group(1)
-                desc_part = rest[:type_m.start()].strip().rstrip('.,')
-                after     = rest[type_m.end():].strip()
-
-                # Amount: last numeric token after the type keyword
-                amount_val = None
-                for tok in reversed(after.split()):
-                    v = _to_float(tok)
-                    if v is not None and v > 0:
-                        amount_val = v
-                        break
+                # Single-pass: DESCRIPTION   ONGOING|NEW   AMOUNT
+                # Amount may have or lack decimal places (e.g. 350,000,000 or 350,000,000.00)
+                full_m = re.match(
+                    r'^(.+?)\s+(ONGOING|NEW)\s+([\d,]+(?:\.\d+)?)\s*$',
+                    remainder.strip(),
+                    re.IGNORECASE,
+                )
+                if full_m:
+                    desc_part  = full_m.group(1).strip().rstrip('.,')
+                    amount_val = _to_float(full_m.group(3))
+                else:
+                    # Fallback: type keyword present but amount may be on a later line,
+                    # or amount is missing — keep description, amount stays None
+                    type_m = TYPE_RE_C.search(remainder)
+                    desc_part  = (remainder[:type_m.start()] if type_m else remainder).strip().rstrip('.,')
+                    # Last numeric-looking token
+                    amount_val = None
+                    for tok in reversed(remainder.split()):
+                        v = _to_float(tok)
+                        if v is not None and v > 0:
+                            amount_val = v
+                            break
 
                 if not desc_part or len(desc_part) < 5:
                     prev_row = None
