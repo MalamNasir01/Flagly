@@ -122,6 +122,7 @@ def _parse_pdf(contents: bytes) -> pd.DataFrame:
     except Exception:
         pass
 
+    print(f"[diag] is_format_b={is_format_b}  is_format_c={is_format_c}")
     if is_format_b:
         return _parse_pdf_format_b(contents)
     elif is_format_c:
@@ -150,19 +151,25 @@ def _detect_format_c(pdf) -> bool:
     """
     try:
         total = len(pdf.pages)
+        print(f"[diag] _detect_format_c: total pages={total}")
         sample = pdf.pages[10:min(36, total)] if total > 10 else pdf.pages
         hits = 0
-        for page in sample:
+        for i, page in enumerate(sample):
+            page_num = (10 if total > 10 else 0) + i
             text = page.extract_text() or ''
             if FORMAT_C_SKIP_RE.search(text):
                 continue
             codes = FORMAT_C_CODE_RE.findall(text)
-            if len(codes) >= 3 and TYPE_RE_C.search(text):
+            has_type = bool(TYPE_RE_C.search(text))
+            if codes or has_type:
+                print(f"[diag]   page {page_num}: codes={len(codes)}  has_type={has_type}  first_code={codes[0] if codes else None}")
+            if len(codes) >= 3 and has_type:
                 hits += 1
+                print(f"[diag]   → hit #{hits} on page {page_num}")
                 if hits >= 2:
                     return True
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[diag] _detect_format_c exception: {e}")
     return False
 
 
@@ -405,9 +412,14 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
         return pd.DataFrame()
 
     pages = text.split('\x0c')
+    print(f"[diag] Format C pdftotext: {len(pages)} page chunks, total chars={len(text)}")
+    if len(pages) > 10:
+        p10_lines = pages[10].splitlines()[:8]
+        print(f"[diag] Page-10 first 8 lines raw: {p10_lines}")
     rows = []
     current_ministry = None
     current_mda_code = None
+    pages_parsed = 0
 
     for page_text in pages:
         # Skip summary / header-only pages
@@ -420,6 +432,7 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
         if not FORMAT_C_CODE_RE.search(page_text):
             continue
 
+        pages_parsed += 1
         lines = page_text.splitlines()
         prev_row = None
 
@@ -512,6 +525,14 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
                 if not prev_row['location']:
                     prev_row['location'] = _extract_location_c(merged)
 
+    ergp_rows = [r for r in rows if r.get('project_code') and r['project_code'].startswith('ERGP')]
+    print(f"[diag] FORMAT C ROWS WITH ERGP CODES: {len(ergp_rows)}")
+    print(f"[diag] TOTAL ROWS COLLECTED: {len(rows)}")
+    print(f"[diag] PAGES THAT PASSED ALL GUARDS: {pages_parsed}")
+    if ergp_rows:
+        print(f"[diag] SAMPLE: {ergp_rows[0]}")
+    elif rows:
+        print(f"[diag] SAMPLE (no ERGP): {rows[0]}")
     print(f"[parser] Format C: extracted {len(rows)} project rows")
     return _finalize_df(rows)
 
