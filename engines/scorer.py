@@ -1,5 +1,5 @@
 """
-scorer.py — Risk scoring engine for UDEME Budget Scanner
+scorer.py — Risk scoring engine for Flagly
 Assigns numeric risk score 0–100 and risk level HIGH/MEDIUM/LOW.
 """
 

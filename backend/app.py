@@ -1,5 +1,5 @@
 """
-app.py — UDEME Budget Scanner API
+app.py — Flagly Budget Scanner API
 Run with: uvicorn app:app --reload --port 8000
 """
 
@@ -21,7 +21,7 @@ from engines.flags import (
 )
 
 app = FastAPI(
-    title="UDEME Budget Scanner",
+    title="Flagly — Nigerian Budget Red Flag Scanner",
     description="Automated red-flag detection for Nigerian budget appropriations",
     version="1.0.0"
 )
@@ -81,7 +81,7 @@ def _df_to_records(df: pd.DataFrame) -> list:
 @app.get("/")
 def root():
     return {
-        "service": "UDEME Budget Scanner",
+        "service": "Flagly — Nigerian Budget Red Flag Scanner",
         "status": "running",
         "endpoints": {
             "upload_single": "POST /scan",

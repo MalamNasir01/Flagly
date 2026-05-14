@@ -13,7 +13,7 @@ from engines.parser import parse_file
 from engines.flags import run_all_flags
 from engines.scorer import score_items
 
-app = FastAPI(title="UDEME Budget Red-Flag Scanner")
+app = FastAPI(title="Flagly — Nigerian Budget Red Flag Scanner")
 
 app.add_middleware(
     CORSMiddleware,

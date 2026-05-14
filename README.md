@@ -1,7 +1,6 @@
-# UDEME Budget Red-Flag Scanner
+# Flagly — Nigerian Budget Red Flag Scanner
 
 Automated detection of red flags in Nigerian budget appropriations.
-Built for the UDEME Social Accountability Platform — CJID.
 
 ---
 
@@ -139,4 +138,4 @@ Edit `backend/engines/flags.py`:
 
 ---
 
-Built by CJID · UDEME Social Accountability Platform
+Flagly · Public Accountability Tool

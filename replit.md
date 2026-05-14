@@ -1,6 +1,6 @@
-# UDEME Budget Red-Flag Scanner
+# Flagly — Nigerian Budget Red Flag Scanner
 
-A web tool for accountability journalists at the Centre for Journalism Innovation & Development (CJID) that automatically detects suspicious items in Nigerian public budget files.
+A web tool for accountability journalists that automatically detects suspicious items in Nigerian public budget files.
 
 ## Architecture
 
@@ -15,7 +15,7 @@ engines/
   flags.py           # 5-flag detection engine
   scorer.py          # Risk scoring (0-100 scale)
 frontend/
-  index.html         # Complete single-file frontend, dark theme, UDEME branding
+  index.html         # Complete single-file frontend, dark theme, Flagly branding
 ```
 
 ## Features

@@ -1,5 +1,5 @@
 """
-flags.py — UDEME Budget Scanner
+flags.py — Flagly Budget Scanner
 Four red-flag engines that run on a standardised budget DataFrame.
 
 Each engine returns a list of dicts:

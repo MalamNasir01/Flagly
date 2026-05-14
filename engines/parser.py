@@ -1,5 +1,5 @@
 """
-parser.py — PDF/Excel/CSV parsing engine for UDEME Budget Scanner
+parser.py — PDF/Excel/CSV parsing engine for Flagly
 Handles Format A (Federal MDA summary), Format B (State project-level),
 and Format C (Federal project-level, pages ~10–end of Appropriation Bill)
 """

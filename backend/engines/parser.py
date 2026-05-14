@@ -1,5 +1,5 @@
 """
-parser.py — UDEME Budget Scanner
+parser.py — Flagly Budget Scanner
 Robustly parses Nigerian budget files (PDF, Excel, CSV).
 Handles merged headers, numeric column names, multi-row headers,
 duplicate columns, and data that doesn't start on row 1.

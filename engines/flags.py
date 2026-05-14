@@ -1,5 +1,5 @@
 """
-flags.py — Red-flag detection engine for UDEME Budget Scanner
+flags.py — Red-flag detection engine for Flagly
 Flag types:
   INFLATED_AMOUNT, CONTEXT_MISMATCH, MISSING_LOCATION,
   DUPLICATE_CLUSTER, GHOST_PROJECT,
