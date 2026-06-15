@@ -6,12 +6,4 @@ rapidfuzz
 openpyxl
 xlrd
 python-multipart
-fastapi
-openpyxl
-pandas
-pdfplumber
-python-multipart
-rapidfuzz
-uvicorn
-xlrd
 aiofiles
