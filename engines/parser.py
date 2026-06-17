@@ -582,17 +582,101 @@ def _extract_location_c(description: str) -> Optional[str]:
 
 # ─── Excel / CSV ──────────────────────────────────────────────────────────────
 
+# Keywords used to locate the real header row inside a messy spreadsheet
+# (state "consolidation templates" usually have title/logo rows on top).
+_HEADER_KEYWORDS = [
+    'amount', 'total', 'allocation', 'approved', 'budget', 'estimate',
+    'proposed', 'capital', 'overhead', 'personnel', 'recurrent',
+    'description', 'project', 'item', 'activity', 'mda', 'particular',
+    'detail', 'name', 'location', 'state', 'lga', 'constituency',
+    'ward', 'zone', 'code',
+]
+
+
 def _parse_excel(contents: bytes, filename: str) -> pd.DataFrame:
     try:
         name_lower = filename.lower()
-        if name_lower.endswith('.xls'):
-            df = pd.read_excel(io.BytesIO(contents), engine='xlrd')
-        else:
-            df = pd.read_excel(io.BytesIO(contents), engine='openpyxl')
-        return _auto_detect_columns(df)
+        engine = 'xlrd' if name_lower.endswith('.xls') else 'openpyxl'
+        try:
+            xls = pd.ExcelFile(io.BytesIO(contents), engine=engine)
+        except Exception as e:
+            # Fall back to the alternate engine (some .xlsx are mislabelled .xls etc.)
+            alt = 'openpyxl' if engine == 'xlrd' else 'xlrd'
+            print(f"[parser] Excel engine '{engine}' failed ({e}); retrying with '{alt}'")
+            xls = pd.ExcelFile(io.BytesIO(contents), engine=alt)
+
+        frames = []
+        for sheet_name in xls.sheet_names:
+            try:
+                raw = xls.parse(sheet_name, header=None, dtype=object)
+            except Exception as e:
+                print(f"[parser] Excel sheet '{sheet_name}' read error: {e}")
+                continue
+            if raw is None or raw.empty:
+                continue
+
+            header_idx = _find_header_row(raw)
+            if header_idx is None:
+                continue
+
+            columns = _dedupe_columns(raw.iloc[header_idx].tolist())
+            data = raw.iloc[header_idx + 1:].copy()
+            data.columns = columns
+            data = data.dropna(axis=1, how='all')
+            if data.empty:
+                continue
+
+            detected = _auto_detect_columns(data)
+            if detected is not None and not detected.empty:
+                print(f"[parser] Excel sheet '{sheet_name}': "
+                      f"header row {header_idx}, {len(detected)} rows extracted")
+                frames.append(detected)
+
+        if not frames:
+            print("[parser] Excel: no usable rows found on any sheet")
+            return pd.DataFrame()
+
+        combined = pd.concat(frames, ignore_index=True)
+        combined = combined.reset_index(drop=True)
+        combined['row_id'] = combined.index + 1
+        return combined
     except Exception as e:
         print(f"[parser] Excel parse error: {e}")
         return pd.DataFrame()
+
+
+def _find_header_row(raw: pd.DataFrame, max_scan: int = 40) -> Optional[int]:
+    """Locate the row most likely to be the table header by keyword scoring."""
+    best_idx, best_score = None, 0
+    for i in range(min(max_scan, len(raw))):
+        cells = [
+            str(c).strip().lower()
+            for c in raw.iloc[i].tolist()
+            if c is not None and str(c).strip() and str(c).strip().lower() != 'nan'
+        ]
+        if len(cells) < 2:
+            continue
+        score = sum(1 for cell in cells for kw in _HEADER_KEYWORDS if kw in cell)
+        if score > best_score:
+            best_score, best_idx = score, i
+    return best_idx if best_score >= 2 else None
+
+
+def _dedupe_columns(header: list) -> list:
+    """Stringify header cells and make duplicate/blank names unique."""
+    seen: dict = {}
+    out = []
+    for idx, raw_name in enumerate(header):
+        name = str(raw_name).strip() if raw_name is not None else ''
+        if not name or name.lower() == 'nan':
+            name = f'col_{idx}'
+        if name in seen:
+            seen[name] += 1
+            name = f'{name}_{seen[name]}'
+        else:
+            seen[name] = 0
+        out.append(name)
+    return out
 
 
 def _parse_csv(contents: bytes) -> pd.DataFrame:
@@ -605,10 +689,13 @@ def _parse_csv(contents: bytes) -> pd.DataFrame:
 
 
 def _auto_detect_columns(df: pd.DataFrame) -> pd.DataFrame:
-    cols_lower = {c: c.lower() for c in df.columns}
+    cols_lower = {c: str(c).lower() for c in df.columns}
 
-    amount_kw = ['amount', 'total', 'allocation', 'approved budget', 'total allocation', 'capital', 'overhead']
-    desc_kw   = ['description', 'project', 'item', 'activity', 'mda', 'administrative unit']
+    amount_kw = ['approved budget', 'total allocation', 'amount', 'approved',
+                 'allocation', 'total', 'estimate', 'proposed', 'budget',
+                 'capital', 'overhead']
+    desc_kw   = ['description', 'project', 'item', 'activity', 'mda',
+                 'administrative unit', 'particular', 'detail', 'name']
     loc_kw    = ['location', 'state', 'lga', 'constituency', 'ward', 'zone']
 
     def first_match(keywords):
@@ -622,11 +709,22 @@ def _auto_detect_columns(df: pd.DataFrame) -> pd.DataFrame:
     desc_col   = first_match(desc_kw)
     loc_col    = first_match(loc_kw)
 
+    # Without at least a description or amount column there's nothing to analyse.
+    if desc_col is None and amount_col is None:
+        return pd.DataFrame()
+
     rows = []
     for _, row in df.iterrows():
-        desc       = str(row[desc_col]).strip() if desc_col else ''
-        amount_val = _to_float(row[amount_col]) if amount_col else None
-        location   = str(row[loc_col]).strip() if loc_col else None
+        desc       = str(row[desc_col]).strip() if desc_col is not None else ''
+        amount_val = _to_float(row[amount_col]) if amount_col is not None else None
+        location   = str(row[loc_col]).strip() if loc_col is not None else None
+        if desc.lower() in ('', 'nan', 'none'):
+            desc = ''
+        if location is not None and location.lower() in ('', 'nan', 'none'):
+            location = None
+        # Skip aggregate/summary rows so they don't double-count amounts.
+        if re.match(r'^(grand\s+)?(sub[\s\-]?)?total\b', desc.strip(), re.I):
+            continue
         rows.append({
             'row_id':       None,
             'description':  desc,
