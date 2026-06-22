@@ -615,24 +615,18 @@ def _parse_excel(contents: bytes, filename: str) -> pd.DataFrame:
             if raw is None or raw.empty:
                 continue
 
-            header_idx = _find_header_row(raw)
-            if header_idx is None:
-                continue
-
-            columns = _dedupe_columns(raw.iloc[header_idx].tolist())
-            data = raw.iloc[header_idx + 1:].copy()
-            data.columns = columns
-            data = data.dropna(axis=1, how='all')
-            if data.empty:
-                continue
-
-            detected = _auto_detect_columns(data)
+            detected = _extract_from_sheet(raw)
             if detected is not None and not detected.empty:
-                print(f"[parser] Excel sheet '{sheet_name}': "
-                      f"header row {header_idx}, {len(detected)} rows extracted")
+                print(f"[parser] Excel sheet '{sheet_name}': {len(detected)} rows extracted")
                 frames.append(detected)
 
         if not frames:
+            # Last resort: some government "xlsx/xls" files are actually HTML
+            # tables with a spreadsheet extension. Try parsing them as HTML.
+            html_df = _try_html_tables(contents)
+            if html_df is not None and not html_df.empty:
+                print(f"[parser] Excel: parsed as HTML tables, {len(html_df)} rows")
+                return html_df
             print("[parser] Excel: no usable rows found on any sheet")
             return pd.DataFrame()
 
@@ -642,7 +636,111 @@ def _parse_excel(contents: bytes, filename: str) -> pd.DataFrame:
         return combined
     except Exception as e:
         print(f"[parser] Excel parse error: {e}")
+        html_df = _try_html_tables(contents)
+        if html_df is not None and not html_df.empty:
+            print(f"[parser] Excel: parsed as HTML tables (after error), {len(html_df)} rows")
+            return html_df
         return pd.DataFrame()
+
+
+def _extract_from_sheet(raw: pd.DataFrame) -> pd.DataFrame:
+    """Extract rows from a single raw sheet (read with header=None).
+
+    Strategy: locate the header row by keyword scoring and map named columns.
+    If that fails, fall back to format-agnostic positional inference (pick the
+    most text-heavy column as description and the most numeric column as amount).
+    """
+    header_idx = _find_header_row(raw)
+    if header_idx is not None:
+        columns = _dedupe_columns(raw.iloc[header_idx].tolist())
+        data = raw.iloc[header_idx + 1:].copy()
+        data.columns = columns
+        data = data.dropna(axis=1, how='all')
+        if not data.empty:
+            detected = _auto_detect_columns(data)
+            if detected is not None and not detected.empty:
+                return detected
+
+    return _extract_positional(raw)
+
+
+def _extract_positional(raw: pd.DataFrame) -> pd.DataFrame:
+    """Infer description/amount columns by content when headers are unrecognizable."""
+    if raw is None or raw.empty or raw.shape[1] < 2:
+        return pd.DataFrame()
+
+    ncols = raw.shape[1]
+    num_score = [0] * ncols
+    text_score = [0] * ncols
+    for ci in range(ncols):
+        for val in raw.iloc[:, ci]:
+            if val is None:
+                continue
+            s = str(val).strip()
+            if not s or s.lower() == 'nan':
+                continue
+            f = _to_float(s)
+            if f is not None and abs(f) >= 1000:
+                num_score[ci] += 1
+            elif re.search(r'[A-Za-z]{4,}', s):
+                text_score[ci] += 1
+
+    desc_ci = max(range(ncols), key=lambda i: text_score[i]) if any(text_score) else None
+    amount_ci = max(range(ncols), key=lambda i: num_score[i]) if any(num_score) else None
+
+    # Need a meaningful description column to avoid scraping junk sheets.
+    if desc_ci is None or text_score[desc_ci] < 3:
+        return pd.DataFrame()
+
+    if amount_ci is not None and amount_ci == desc_ci:
+        order = sorted(range(ncols), key=lambda i: num_score[i], reverse=True)
+        amount_ci = next((i for i in order if i != desc_ci and num_score[i] > 0), None)
+
+    rows = []
+    for _, r in raw.iterrows():
+        desc = str(r.iloc[desc_ci]).strip()
+        if desc.lower() in ('', 'nan', 'none') or not re.search(r'[A-Za-z]{4,}', desc):
+            continue
+        if re.match(r'^(grand\s+)?(sub[\s\-]?)?total\b', desc.strip(), re.I):
+            continue
+        amount_val = _to_float(r.iloc[amount_ci]) if amount_ci is not None else None
+        rows.append({
+            'row_id':       None,
+            'description':  desc[:200],
+            'amount':       amount_val,
+            'location':     None,
+            'ministry':     None,
+            'project_code': None,
+            'is_mda_level': False,
+        })
+
+    return _finalize_df(rows)
+
+
+def _try_html_tables(contents: bytes) -> Optional[pd.DataFrame]:
+    """Parse government 'xlsx/xls' files that are really HTML tables."""
+    try:
+        tables = pd.read_html(io.BytesIO(contents))
+    except Exception:
+        return None
+    if not tables:
+        return None
+
+    frames = []
+    for t in tables:
+        if t is None or t.empty:
+            continue
+        # Rebuild as a header-less raw sheet so the same logic applies.
+        raw = pd.DataFrame([list(t.columns)] + t.values.tolist())
+        detected = _extract_from_sheet(raw)
+        if detected is not None and not detected.empty:
+            frames.append(detected)
+
+    if not frames:
+        return None
+    combined = pd.concat(frames, ignore_index=True).reset_index(drop=True)
+    combined['row_id'] = combined.index + 1
+    return combined
 
 
 def _find_header_row(raw: pd.DataFrame, max_scan: int = 40) -> Optional[int]:
