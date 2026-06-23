@@ -24,6 +24,19 @@ def _is_null_amount(val) -> bool:
         return True
 
 
+def _str_cell(val) -> str:
+    """Safely coerce a DataFrame cell to str, returning '' for None/NaN/Inf."""
+    if val is None:
+        return ''
+    try:
+        if math.isnan(float(val)):
+            return ''
+    except (TypeError, ValueError):
+        pass
+    s = str(val).strip()
+    return s if s.lower() != 'nan' else ''
+
+
 def _fmt_amount(val) -> str:
     if _is_null_amount(val):
         return 'an unspecified amount'
@@ -242,7 +255,7 @@ def flag_duplicates(rows: List[Dict]) -> List[Dict]:
         amounts_raw = [r.get('amount') for r in cluster]
         all_have_amount = all(not _is_null_amount(a) for a in amounts_raw)
         amounts = [float(a) for a in amounts_raw if not _is_null_amount(a)]
-        mdas = {(r.get('ministry') or '').strip() for r in cluster}
+        mdas = {_str_cell(r.get('ministry')) for r in cluster}
         all_same_mda = len(mdas) == 1 and any(mdas)
 
         amounts_close = False
@@ -391,7 +404,7 @@ def flag_budget_splitting(rows: List[Dict]) -> List[Dict]:
     for row in rows:
         if row.get('is_mda_level') or row.get('_exclude'):
             continue
-        ministry = (row.get('ministry') or '').strip()
+        ministry = _str_cell(row.get('ministry'))
         if not ministry:
             continue
         by_mda.setdefault(ministry, []).append(row)
@@ -482,8 +495,8 @@ def _classify_sector(text: str) -> Optional[str]:
 def flag_mandate_mismatch(row: Dict) -> Optional[Dict]:
     if row.get('is_mda_level'):
         return None
-    ministry = (row.get('ministry') or '').strip()
-    description = (row.get('description') or '').strip()
+    ministry = _str_cell(row.get('ministry'))
+    description = _str_cell(row.get('description'))
     if not ministry or not description:
         return None
 
@@ -551,9 +564,9 @@ def flag_duplicates_composite(rows: List[Dict]) -> List[Dict]:
 
     def _valid_composite_key(row):
         """Return composite key string only when all three codes are well-formed digits."""
-        mda = str(row.get('mda_code') or '').strip()
-        eco = str(row.get('economic_code') or '').strip()
-        loc = str(row.get('location_code') or '').strip()
+        mda = _str_cell(row.get('mda_code'))
+        eco = _str_cell(row.get('economic_code'))
+        loc = _str_cell(row.get('location_code'))
         if (len(mda) == 12 and mda.isdigit() and
                 len(eco) == 8 and eco.isdigit() and
                 len(loc) == 8 and loc.isdigit()):
