@@ -82,7 +82,7 @@ def _match_category(description: str):
 
 
 def _has_physical_project_keyword(description: str) -> bool:
-    desc_lower = (description or '').lower()
+    desc_lower = _str_cell(description).lower()
     return any(kw in desc_lower for kw in PHYSICAL_PROJECT_KEYWORDS)
 
 
@@ -371,7 +371,7 @@ VAGUE_LOCATION_PHRASES = [
 def flag_vague_location(row: Dict) -> Optional[Dict]:
     if row.get('is_mda_level'):
         return None
-    description = (row.get('description') or '').lower()
+    description = _str_cell(row.get('description')).lower()
     amount = row.get('amount')
 
     matched = next((p for p in VAGUE_LOCATION_PHRASES if p in description), None)
@@ -647,10 +647,10 @@ _PHANTOM_KEYWORDS = ['construction', 'renovation', 'supply', 'purchase',
 
 def flag_phantom_spending(row: Dict) -> Optional[Dict]:
     """Economic code R&D (23050101) but description indicates physical project."""
-    economic_code = str(row.get('economic_code') or '')
+    economic_code = _str_cell(row.get('economic_code'))
     if not economic_code.startswith('23050101'):
         return None
-    description = (row.get('description') or '').lower()
+    description = _str_cell(row.get('description')).lower()
     matched = next((kw for kw in _PHANTOM_KEYWORDS if kw in description), None)
     if not matched:
         return None
