@@ -1,44 +1,60 @@
 """
-scorer.py — Risk scoring engine for Flagly
-Assigns numeric risk score 0–100 and risk level HIGH/MEDIUM/LOW.
+scorer.py — Composite risk scoring engine for Flagly
+
+Score 0 to 100 combining:
+  - Number of flags triggered
+  - Severity of each flag (HIGH weight 3, MEDIUM weight 1)
+  - Amount weighting (scaled log of naira amount)
+
+Bands: above 60 HIGH, above 25 MEDIUM, below 25 LOW.
 """
 
+import math
 from typing import List, Dict
 
 
+def _safe_amount(val) -> float:
+    try:
+        f = float(val or 0)
+        if math.isnan(f) or math.isinf(f):
+            return 0.0
+        return max(0.0, f)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def score_item(item: Dict) -> Dict:
-    """Score a single flagged item."""
-    flags = item.get('flags', [])
-    amount = item.get('amount') or 0
-    location = item.get('location')
+    """Score a single flagged item with the composite formula."""
+    flags = item.get('flags', []) or []
+    amount = _safe_amount(item.get('amount'))
 
-    score = 0
+    severity_points = 0
+    for f in flags:
+        sev = (f.get('severity') or '').upper()
+        if sev == 'HIGH':
+            severity_points += 3
+        elif sev == 'MEDIUM':
+            severity_points += 1
 
-    has_high = any(f.get('severity') == 'HIGH' for f in flags)
-    has_medium = any(f.get('severity') == 'MEDIUM' for f in flags)
+    flag_count = len(flags)
+    # Severity block: up to 55 points
+    severity_score = min(55, severity_points * 8 + max(0, flag_count - 1) * 5)
 
-    if has_high:
-        score += 40
-    if has_medium:
-        score += 20
+    # Amount weighting: log10 scale, up to 35 points
+    if amount <= 0:
+        amount_score = 0
+    else:
+        # 1e6 → ~3, 1e9 → ~9, 1e10 → ~10
+        amount_score = min(35, max(0, (math.log10(amount) - 5) * 7))
 
-    # Additional flag types beyond the first
-    flag_types = set(f.get('flag_type') for f in flags)
-    extra = max(0, len(flag_types) - 1)
-    score += min(extra * 15, 30)
+    # Base presence of any flag
+    base = 10 if flags else 0
 
-    if amount > 1_000_000_000:
-        score += 10
+    score = int(round(min(100, base + severity_score + amount_score)))
 
-    loc_str = str(location).strip() if location else ''
-    if not loc_str or len(loc_str) <= 3:
-        score += 5
-
-    score = min(score, 100)
-
-    if score >= 70:
+    if score > 60:
         risk_level = 'HIGH'
-    elif score >= 40:
+    elif score > 25:
         risk_level = 'MEDIUM'
     else:
         risk_level = 'LOW'
@@ -49,14 +65,9 @@ def score_item(item: Dict) -> Dict:
 
 
 def score_items(items: List[Dict]) -> List[Dict]:
-    """Score all flagged items. Exclude LOW-risk items with score < 40."""
+    """Score all flagged items and sort by score descending."""
     scored = [score_item(item) for item in items]
-    # Exclude items with only LOW severity flags and score < 40
-    filtered = []
-    for item in scored:
-        flags = item.get('flags', [])
-        all_low = all(f.get('severity') == 'LOW' for f in flags)
-        if all_low and item.get('risk_score', 0) < 40:
-            continue
-        filtered.append(item)
-    return filtered
+    # Keep LOW items so the UI toggle can reveal them; filter only empty flag sets
+    scored = [i for i in scored if i.get('flags')]
+    scored.sort(key=lambda r: (r.get('risk_score') or 0), reverse=True)
+    return scored

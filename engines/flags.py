@@ -8,6 +8,9 @@ Flag types:
 
 import re
 import math
+import json
+import os
+from collections import defaultdict
 from typing import List, Dict, Optional
 from rapidfuzz import fuzz
 
@@ -43,12 +46,50 @@ def _fmt_amount(val) -> str:
     return f'NGN {float(val):,.0f}'
 
 
+def _data_path(name: str) -> str:
+    return os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', name)
+
+
+def _load_json(name: str, default):
+    try:
+        with open(_data_path(name), 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f'[flags] could not load {name}: {e}')
+        return default
+
+
+VAGUE_LOCATION_PHRASES = _load_json('vague_location_phrases.json', [
+    'selected locations', 'multiple lots', 'various states', 'nationwide',
+    'geopolitical zone', 'senatorial zone', 'selected states', 'selected lgas',
+    'various locations', 'across the country',
+])
+
+MDA_MANDATES = _load_json('mda_mandates.json', {})
+NIGERIA_GEO = _load_json('nigeria_states_lgas.json', {'states': []})
+
+_STATE_NAMES = [s['name'] for s in NIGERIA_GEO.get('states', [])]
+_LGA_NAMES = [lga for s in NIGERIA_GEO.get('states', []) for lga in s.get('lgas', [])]
+_GEO_RE = re.compile(
+    r'\b(' + '|'.join(re.escape(n) for n in sorted(_STATE_NAMES + _LGA_NAMES, key=len, reverse=True)) + r')\b',
+    re.IGNORECASE,
+) if (_STATE_NAMES or _LGA_NAMES) else None
+
+
+def _has_specific_geo(text: str) -> bool:
+    if not text:
+        return False
+    if _GEO_RE and _GEO_RE.search(text):
+        return True
+    return False
+
+
 # ─── Category benchmarks ──────────────────────────────────────────────────────
 
 CATEGORY_BENCHMARKS = [
-    (['road', 'highway', 'carriageway'], 3_000_000_000),
+    (['road', 'highway', 'carriageway', 'feeder'], 3_000_000_000),
     (['bridge'],                          3_000_000_000),
-    (['school', 'classroom'],              600_000_000),
+    (['school', 'classroom', 'nursing school'], 600_000_000),
     (['hospital', 'health centre'],      3_000_000_000),
     (['clinic', 'primary health'],         600_000_000),
     (['borehole', 'water supply'],          60_000_000),
@@ -60,9 +101,12 @@ CATEGORY_BENCHMARKS = [
     (['printing', 'publication'],           30_000_000),
     (['consultancy', 'study'],             300_000_000),
     (['empowerment', 'grant'],             300_000_000),
+    (['streetlight', 'street light'],      100_000_000),
+    (['stadium', 'sports'],                500_000_000),
 ]
 
 FALLBACK_THRESHOLD = 1_000_000_000
+HARD_CEILING = 1_000_000_000
 
 PHYSICAL_PROJECT_KEYWORDS = [
     'construction', 'rehabilitation', 'renovation', 'procurement', 'supply',
@@ -86,16 +130,43 @@ def _has_physical_project_keyword(description: str) -> bool:
     return any(kw in desc_lower for kw in PHYSICAL_PROJECT_KEYWORDS)
 
 
+def _category_label(description: str) -> str:
+    cat = _match_category(description)
+    return cat[0] if cat else 'uncategorised'
+
+
 # ─── Flag 1: INFLATED_AMOUNT ──────────────────────────────────────────────────
 
 def flag_inflated_amount(row: Dict) -> Optional[Dict]:
+    """Hard ceiling and category benchmark checks. IQR outliers are added in batch."""
     if row.get('is_mda_level'):
         return None
     amount = row.get('amount')
-    description = row.get('description', '') or ''
+    description = _str_cell(row.get('description') or row.get('project_name'))
     if _is_null_amount(amount):
         return None
     amount = float(amount)
+
+    # 3a. Hard ceiling: any item at or above ₦1B is HIGH
+    if amount >= HARD_CEILING:
+        cat = _match_category(description)
+        label = cat[0] if cat else 'this category'
+        return {
+            'flag_type': 'INFLATED_AMOUNT',
+            'severity': 'HIGH',
+            'title': 'Hard Ceiling Inflated Amount',
+            'explanation': (
+                f'This line item is priced at {_fmt_amount(amount)}. '
+                f'Any single allocation at or above NGN 1,000,000,000 triggers an automatic high risk flag. '
+                f'Cross reference the amount against BPP Price Intelligence benchmarks for {label} before drawing any conclusion.'
+            ),
+            'evidence': {
+                'rule': 'hard_ceiling',
+                'threshold': HARD_CEILING,
+                'category': label,
+                'amount': amount,
+            },
+        }
 
     cat = _match_category(description)
     if cat:
@@ -107,23 +178,85 @@ def flag_inflated_amount(row: Dict) -> Optional[Dict]:
                 'severity': severity,
                 'title': 'Inflated Amount',
                 'explanation': (
-                    f'Amount of {_fmt_amount(amount)} exceeds typical benchmark of '
-                    f'NGN {threshold:,.0f} for {label} projects. '
-                    f'Verify this is not split funding or inflated.'
+                    f'This line item is priced at {_fmt_amount(amount)} for a {label} project. '
+                    f'The category benchmark used by the scanner is NGN {threshold:,.0f}. '
+                    f'The amount exceeds that benchmark. Cross reference against BPP Price Intelligence before publication.'
                 ),
-            }
-    else:
-        if amount > FALLBACK_THRESHOLD:
-            return {
-                'flag_type': 'INFLATED_AMOUNT',
-                'severity': 'HIGH',
-                'title': 'Inflated Amount',
-                'explanation': (
-                    f'Amount of {_fmt_amount(amount)} exceeds ₦1,000,000,000 with no '
-                    f'recognised category match. Verify this is not split funding or inflated.'
-                ),
+                'evidence': {
+                    'rule': 'category_benchmark',
+                    'category': label,
+                    'threshold': threshold,
+                    'amount': amount,
+                },
             }
     return None
+
+
+def flag_iqr_outliers(rows: List[Dict]) -> List[Dict]:
+    """3b. Category relative IQR outlier detection."""
+    by_cat: Dict[str, List[Dict]] = defaultdict(list)
+    for row in rows:
+        if row.get('is_mda_level') or row.get('_exclude'):
+            continue
+        if _is_null_amount(row.get('amount')):
+            continue
+        label = _category_label(_str_cell(row.get('description') or row.get('project_name')))
+        if label == 'uncategorised':
+            continue
+        by_cat[label].append(row)
+
+    for label, members in by_cat.items():
+        if len(members) < 4:
+            continue
+        amounts = sorted(float(r['amount']) for r in members)
+        n = len(amounts)
+        q1 = amounts[n // 4]
+        q3 = amounts[(3 * n) // 4]
+        iqr = q3 - q1
+        if iqr <= 0:
+            continue
+        median = amounts[n // 2]
+        high_bound = q3 + 3 * iqr
+        med_bound = q3 + 1.5 * iqr
+
+        for row in members:
+            amt = float(row['amount'])
+            if amt <= med_bound:
+                continue
+            # Skip if a hard ceiling / benchmark flag already covers this as HIGH with higher rule priority
+            existing = [f for f in row.get('_flags', []) if f.get('flag_type') == 'INFLATED_AMOUNT']
+            if any(f.get('evidence', {}).get('rule') == 'hard_ceiling' for f in existing):
+                continue
+            severity = 'HIGH' if amt > high_bound else 'MEDIUM'
+            flag = {
+                'flag_type': 'INFLATED_AMOUNT',
+                'severity': severity,
+                'title': 'IQR Outlier Inflated Amount',
+                'explanation': (
+                    f'This line item is priced at {_fmt_amount(amt)} within the {label} category of this budget. '
+                    f'The category median is {_fmt_amount(median)}. '
+                    f'The statistical upper bound used by the scanner is {_fmt_amount(high_bound if severity == "HIGH" else med_bound)}. '
+                    f'This item sits above that bound. Cross reference the amount against BPP Price Intelligence benchmarks before drawing any conclusion.'
+                ),
+                'evidence': {
+                    'rule': 'iqr_outlier',
+                    'category': label,
+                    'median': median,
+                    'q1': q1,
+                    'q3': q3,
+                    'iqr': iqr,
+                    'medium_bound': med_bound,
+                    'high_bound': high_bound,
+                    'amount': amt,
+                },
+            }
+            # Replace weaker inflated flag or append
+            if existing:
+                row['_flags'] = [f for f in row['_flags'] if f.get('flag_type') != 'INFLATED_AMOUNT'] + [flag]
+            else:
+                row.setdefault('_flags', []).append(flag)
+
+    return rows
 
 
 # ─── Flag 2: CONTEXT_MISMATCH ─────────────────────────────────────────────────
@@ -217,88 +350,94 @@ def _has_action_verb(description: str) -> bool:
 
 def flag_duplicates(rows: List[Dict]) -> List[Dict]:
     """
-    Group rows by description similarity ≥95% into clusters.
-    Only compare descriptions ≥40 chars with at least one action verb.
-    Flag D enhancement: if cluster members have amounts within 10% of each other
-    AND all under the same MDA, upgrade severity to HIGH and note systematic splitting.
+    Duplicate matching with RapidFuzz token_set_ratio.
+    Similarity 95 to 100 is HIGH. Similarity 85 to 94 is MEDIUM.
+    Both paired items are flagged and carry matched counterpart evidence.
     """
     candidates = [
         r for r in rows
-        if r.get('description')
-        and len(r['description']) >= 40
-        and not r['description'][0].isdigit()
-        and _has_action_verb(r['description'])
+        if _str_cell(r.get('description') or r.get('project_name'))
+        and len(_str_cell(r.get('description') or r.get('project_name'))) >= 40
+        and not _str_cell(r.get('description') or r.get('project_name'))[0].isdigit()
+        and _has_action_verb(_str_cell(r.get('description') or r.get('project_name')))
     ]
 
-    visited = set()
-    clusters = []
+    # Track best pair per row
+    best_pair: Dict[int, Dict] = {}
 
     for i, row_a in enumerate(candidates):
-        if id(row_a) in visited:
-            continue
-        cluster = [row_a]
-        visited.add(id(row_a))
-        for j, row_b in enumerate(candidates):
-            if i == j or id(row_b) in visited:
+        desc_a = _str_cell(row_a.get('description') or row_a.get('project_name'))
+        for j in range(i + 1, len(candidates)):
+            row_b = candidates[j]
+            desc_b = _str_cell(row_b.get('description') or row_b.get('project_name'))
+            score = fuzz.token_set_ratio(desc_a, desc_b)
+            if score < 85:
                 continue
-            if fuzz.ratio(row_a['description'], row_b['description']) >= 95:
-                cluster.append(row_b)
-                visited.add(id(row_b))
-        if len(cluster) >= 2:
-            clusters.append(cluster)
+            severity = 'HIGH' if score >= 95 else 'MEDIUM'
+            pair_info_a = {
+                'score': score,
+                'severity': severity,
+                'counterpart_row_id': row_b.get('row_id'),
+                'counterpart_description': desc_b[:120],
+                'counterpart_amount': row_b.get('amount'),
+                'counterpart_code': row_b.get('project_code'),
+            }
+            pair_info_b = {
+                'score': score,
+                'severity': severity,
+                'counterpart_row_id': row_a.get('row_id'),
+                'counterpart_description': desc_a[:120],
+                'counterpart_amount': row_a.get('amount'),
+                'counterpart_code': row_a.get('project_code'),
+            }
+            for row, info in ((row_a, pair_info_a), (row_b, pair_info_b)):
+                rid = id(row)
+                prev = best_pair.get(rid)
+                if prev is None or info['score'] > prev['score']:
+                    best_pair[rid] = info
+                    best_pair[rid]['_row'] = row
 
-    for cluster in clusters:
-        n = len(cluster)
-        cluster_row_ids = [r.get('row_id') for r in cluster]
+    # Group into clusters of mutual high matches for cluster_size reporting
+    cluster_ids: Dict[int, set] = defaultdict(set)
+    for rid, info in best_pair.items():
+        row = info['_row']
+        cluster_ids[rid].add(row.get('row_id'))
+        cluster_ids[rid].add(info['counterpart_row_id'])
 
-        # Flag D: detect systematic splitting
-        amounts_raw = [r.get('amount') for r in cluster]
-        all_have_amount = all(not _is_null_amount(a) for a in amounts_raw)
-        amounts = [float(a) for a in amounts_raw if not _is_null_amount(a)]
-        mdas = {_str_cell(r.get('ministry')) for r in cluster}
-        all_same_mda = len(mdas) == 1 and any(mdas)
-
-        amounts_close = False
-        if all_have_amount and len(amounts) >= 2:
-            mean_amt = sum(amounts) / len(amounts)
-            if mean_amt > 0:
-                max_diff = max(abs(a - mean_amt) / mean_amt for a in amounts)
-                amounts_close = max_diff <= 0.10
-
-        is_systematic = amounts_close and all_same_mda and n >= 3
-
-        explanation = f'This project description appears {n} times across the budget. '
-        if is_systematic:
-            explanation += (
-                'Identical amounts suggest systematic splitting rather than coincidental '
-                'duplication. '
-            )
-        explanation += (
-            'Verify these are genuinely separate projects at different locations '
-            'and not the same allocation duplicated.'
-        )
-
-        members_with_amount = [r for r in cluster if not _is_null_amount(r.get('amount'))]
-        if members_with_amount:
-            representative = max(members_with_amount, key=lambda r: float(r['amount']))
-        else:
-            representative = max(cluster, key=lambda r: len(r.get('description') or ''))
-
+    for rid, info in best_pair.items():
+        row = info['_row']
+        matched = sorted(x for x in cluster_ids[rid] if x is not None)
+        n = max(2, len(matched))
+        severity = info['severity']
+        if n > 5:
+            severity = 'HIGH'
         flag = {
             'flag_type': 'DUPLICATE_CLUSTER',
             'cluster_size': n,
-            'matched_rows': cluster_row_ids,
-            'severity': 'HIGH' if (is_systematic or n > 5) else 'MEDIUM',
+            'matched_rows': matched,
+            'severity': severity,
             'title': f'Duplicate Cluster ({n}x)',
-            'explanation': explanation,
+            'explanation': (
+                f'This project description closely matches another line item at {info["score"]}% similarity. '
+                f'The matched counterpart is "{info["counterpart_description"]}" '
+                f'({_fmt_amount(info["counterpart_amount"])}). '
+                f'Verify these are genuinely separate projects at different locations and not the same allocation duplicated. '
+                f'File a Freedom of Information request for award history if the sites cannot be distinguished.'
+            ),
+            'evidence': {
+                'similarity': info['score'],
+                'matched_row_id': info['counterpart_row_id'],
+                'matched_description': info['counterpart_description'],
+                'matched_amount': info['counterpart_amount'],
+                'matched_code': info['counterpart_code'],
+                'matched_rows': matched,
+            },
         }
-
-        representative.setdefault('_flags', []).append(flag)
-        representative['cluster_size'] = n
-
-        for member in cluster:
-            if member is not representative:
-                member['_exclude'] = True
+        # Avoid duplicate DUPLICATE_CLUSTER flags
+        existing = [f for f in row.get('_flags', []) if f.get('flag_type') == 'DUPLICATE_CLUSTER']
+        if not existing:
+            row.setdefault('_flags', []).append(flag)
+            row['cluster_size'] = n
 
     return rows
 
@@ -324,7 +463,7 @@ def flag_ghost_project(row: Dict, all_descriptions: List[str], budget_year: Opti
     if not _is_null_amount(amount) and float(amount) < 1_000_000:
         return None
 
-    description = row.get('description', '') or ''
+    description = _str_cell(row.get('description') or row.get('project_name'))
     years_in_desc = [int(m) for m in YEAR_RE.findall(description)]
     stale_years = [y for y in years_in_desc if by - y >= 2]
     if not stale_years:
@@ -333,7 +472,7 @@ def flag_ghost_project(row: Dict, all_descriptions: List[str], budget_year: Opti
     for other_desc in all_descriptions:
         if other_desc == description:
             continue
-        if fuzz.ratio(description, other_desc) >= 95:
+        if fuzz.token_set_ratio(description, other_desc) >= 95:
             other_years = [int(m) for m in YEAR_RE.findall(other_desc)]
             if any(by - y >= 2 for y in other_years):
                 return {
@@ -342,9 +481,10 @@ def flag_ghost_project(row: Dict, all_descriptions: List[str], budget_year: Opti
                     'title': 'Ghost Project',
                     'explanation': (
                         f'This description closely matches a project from '
-                        f'{min(stale_years)} — 2+ years before the {budget_year} budget. '
-                        f'Verify this is not a recycled or ghost allocation.'
+                        f'{min(stale_years)}, which is 2 or more years before the {budget_year} budget. '
+                        f'Search Open Treasury and tracka.ng for completion evidence before treating this as a new allocation.'
                     ),
+                    'evidence': {'stale_years': stale_years, 'budget_year': by},
                 }
 
     return {
@@ -352,44 +492,121 @@ def flag_ghost_project(row: Dict, all_descriptions: List[str], budget_year: Opti
         'severity': 'MEDIUM',
         'title': 'Ghost Project',
         'explanation': (
-            f'This description references {min(stale_years)} — 2+ years before the '
-            f'{budget_year} budget. Verify this is not a recycled or ghost allocation.'
+            f'This description references {min(stale_years)}, which is 2 or more years before the '
+            f'{budget_year} budget. Search Open Treasury and tracka.ng for completion evidence.'
         ),
+        'evidence': {'stale_years': stale_years, 'budget_year': by},
     }
+
+
+def flag_ghost_projects_multiyear(year_frames: Dict[str, List[Dict]]) -> List[Dict]:
+    """Cross year ghost detection when two or more budget years are uploaded.
+
+    Recurrence across three or more consecutive years with ONGOING is HIGH.
+    Two year recurrence is MEDIUM.
+    """
+    if len(year_frames) < 2:
+        return []
+
+    years = sorted(int(y) for y in year_frames.keys())
+    # Flatten candidates by year
+    indexed = []
+    for y in years:
+        for row in year_frames[str(y)]:
+            desc = _str_cell(row.get('description') or row.get('project_name'))
+            if len(desc) < 20:
+                continue
+            indexed.append((y, desc, row))
+
+    # For each row in the newest year, find matches in earlier years
+    results_touched = []
+    newest = years[-1]
+    for y, desc, row in indexed:
+        if y != newest:
+            continue
+        appearances = {y: {'amount': row.get('amount'), 'status': _str_cell(row.get('project_status')), 'row_id': row.get('row_id')}}
+        for y2, desc2, row2 in indexed:
+            if y2 >= y:
+                continue
+            if fuzz.token_set_ratio(desc, desc2) < 90:
+                continue
+            appearances[y2] = {
+                'amount': row2.get('amount'),
+                'status': _str_cell(row2.get('project_status')),
+                'row_id': row2.get('row_id'),
+            }
+        if len(appearances) < 2:
+            continue
+        yrs = sorted(appearances.keys())
+        # consecutive check
+        consecutive = all(yrs[i + 1] - yrs[i] == 1 for i in range(len(yrs) - 1))
+        ongoing_streak = all(
+            (appearances[yy].get('status') or '').upper() == 'ONGOING' for yy in yrs
+        )
+        if len(yrs) >= 3 and consecutive and ongoing_streak:
+            severity = 'HIGH'
+        elif len(yrs) >= 3 and consecutive:
+            severity = 'HIGH'
+        else:
+            severity = 'MEDIUM'
+
+        year_lines = ', '.join(
+            f"{yy} ({_fmt_amount(appearances[yy]['amount'])})" for yy in yrs
+        )
+        flag = {
+            'flag_type': 'GHOST_PROJECT',
+            'severity': severity,
+            'title': 'Multi Year Ghost Project',
+            'explanation': (
+                f'This project name recurs across budget years {year_lines}. '
+                f'Search Open Treasury and tracka.ng for completion evidence before accepting another rollover.'
+            ),
+            'evidence': {
+                'years': appearances,
+                'year_list': yrs,
+            },
+        }
+        row.setdefault('_flags', []).append(flag)
+        results_touched.append(row)
+
+    return results_touched
 
 
 # ─── Flag A: VAGUE_LOCATION ───────────────────────────────────────────────────
 
-VAGUE_LOCATION_PHRASES = [
-    'selected locations', 'multiple locations', 'multiple lots',
-    'various locations', 'selected states', 'various states',
-    'nationwide', 'across the country', 'various places', 'multiple sites',
-    'different locations', 'different states', 'selected areas',
-]
-
-
 def flag_vague_location(row: Dict) -> Optional[Dict]:
     if row.get('is_mda_level'):
         return None
-    description = _str_cell(row.get('description')).lower()
+    description = _str_cell(row.get('description') or row.get('project_name'))
+    location = _str_cell(row.get('location'))
+    combined = f'{description} {location}'.strip().lower()
     amount = row.get('amount')
 
-    matched = next((p for p in VAGUE_LOCATION_PHRASES if p in description), None)
+    matched = next((p for p in VAGUE_LOCATION_PHRASES if p in combined), None)
     if not matched:
         return None
 
+    # Spec: phrase present and no specific state or LGA extracted
+    if _has_specific_geo(location) or _has_specific_geo(description):
+        return None
+
     severity = 'MEDIUM'
-    if not _is_null_amount(amount) and float(amount) > 1_000_000_000:
+    if not _is_null_amount(amount) and float(amount) >= 5_000_000:
         severity = 'HIGH'
 
     return {
         'flag_type': 'VAGUE_LOCATION',
         'severity': severity,
-        'title': 'Non-Traceable Location',
+        'title': 'Non Traceable Location',
         'explanation': (
-            f'Project description uses vague location language ("{matched}"). '
-            f'Without specific locations, implementation cannot be tracked or verified.'
+            f'The project description uses vague location language ("{matched}"). '
+            f'Without a specific state or LGA, implementation cannot be tracked. '
+            f'Request geo tagged evidence from the responsible MDA or check tracka.ng for site reports.'
         ),
+        'evidence': {
+            'phrase': matched,
+            'location': location or None,
+        },
     }
 
 
@@ -474,11 +691,13 @@ def flag_budget_splitting(rows: List[Dict]) -> List[Dict]:
 # ─── Flag C: MANDATE_MISMATCH ─────────────────────────────────────────────────
 
 MANDATE_MAP = {
-    'road':        ['road', 'highway', 'bridge', 'transport', 'works', 'infrastructure'],
-    'health':      ['health', 'hospital', 'medical', 'clinic', 'pharmaceutical'],
-    'education':   ['education', 'school', 'university', 'college', 'training'],
-    'water':       ['water', 'irrigation', 'dam', 'sanitation'],
+    'road':        ['road', 'highway', 'bridge', 'transport', 'works', 'infrastructure', 'carriageway', 'feeder'],
+    'health':      ['health', 'hospital', 'medical', 'clinic', 'pharmaceutical', 'nursing'],
+    'education':   ['education', 'school', 'university', 'college', 'training', 'classroom'],
+    'water':       ['water', 'irrigation', 'dam', 'sanitation', 'borehole'],
     'agriculture': ['agriculture', 'farm', 'livestock', 'fishery', 'food'],
+    'power':       ['power', 'electricity', 'streetlight', 'street light', 'grid'],
+    'sports':      ['stadium', 'sports', 'recreation'],
 }
 
 
@@ -492,28 +711,89 @@ def _classify_sector(text: str) -> Optional[str]:
     return None
 
 
+def _lookup_mda_scope(mda_name: str) -> Optional[Dict]:
+    if not mda_name or not MDA_MANDATES:
+        return None
+    key = mda_name.strip().upper()
+    if key in MDA_MANDATES:
+        return MDA_MANDATES[key]
+    for name, meta in MDA_MANDATES.items():
+        aliases = [a.upper() for a in meta.get('aliases', [])]
+        if key == name.upper() or key in aliases or any(a in key or key in a for a in aliases + [name.upper()]):
+            return meta
+    return None
+
+
 def flag_mandate_mismatch(row: Dict) -> Optional[Dict]:
     if row.get('is_mda_level'):
         return None
-    ministry = _str_cell(row.get('ministry'))
-    description = _str_cell(row.get('description'))
+    ministry = _str_cell(row.get('mda_name') or row.get('ministry'))
+    description = _str_cell(row.get('description') or row.get('project_name'))
     if not ministry or not description:
         return None
 
+    # Prefer reference table scope intersection
+    meta = _lookup_mda_scope(ministry)
+    if meta:
+        scope = [s.lower() for s in meta.get('scope', [])]
+        desc_lower = description.lower()
+        proj_cat = _match_category(description)
+        proj_keywords = []
+        if proj_cat:
+            # Expand matched category keywords
+            for keywords, _ in CATEGORY_BENCHMARKS:
+                if keywords[0] == proj_cat[0]:
+                    proj_keywords = keywords
+                    break
+        # Also check sector keywords in description
+        proj_sector = _classify_sector(description)
+        intersects = any(sk in desc_lower for sk in scope)
+        if intersects:
+            return None
+        # Only fire when we can identify a clear out of scope category
+        out_of_scope_markers = ['school', 'stadium', 'nursing', 'hospital', 'classroom', 'university']
+        hit = next((m for m in out_of_scope_markers if m in desc_lower and m not in ' '.join(scope)), None)
+        if not hit and proj_sector:
+            # sector not overlapping scope words
+            if not any(proj_sector[:4] in s or s in proj_sector for s in scope):
+                hit = proj_sector
+        if not hit:
+            return None
+        return {
+            'flag_type': 'MANDATE_MISMATCH',
+            'severity': 'HIGH',
+            'title': 'Possible Mandate Violation',
+            'explanation': (
+                f'{ministry} is scoped to {", ".join(scope[:5])}, but this project describes {hit} work. '
+                f'That category does not intersect the agency functional scope in the mandate reference table. '
+                f'Request the enabling instrument or procurement plan from the MDA.'
+            ),
+            'evidence': {
+                'mda': ministry,
+                'scope': scope,
+                'project_marker': hit,
+                'project_category': proj_cat[0] if proj_cat else None,
+            },
+        }
+
+    # Fallback sector classifier
     mda_sector  = _classify_sector(ministry)
     proj_sector = _classify_sector(description)
-
     if not mda_sector or not proj_sector or mda_sector == proj_sector:
         return None
 
     return {
         'flag_type': 'MANDATE_MISMATCH',
-        'severity':  'MEDIUM',
+        'severity':  'HIGH',
         'title':     'Possible Mandate Violation',
         'explanation': (
             f'{ministry} is a {mda_sector} agency but this project appears to be a '
-            f'{proj_sector} project. Verify this allocation is within the agency\'s mandate.'
+            f'{proj_sector} project. Request the enabling instrument or procurement plan from the MDA.'
         ),
+        'evidence': {
+            'mda_sector': mda_sector,
+            'project_sector': proj_sector,
+        },
     }
 
 
@@ -777,6 +1057,8 @@ def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
             if f9: row['_flags'].append(f9)
 
     # Batch flags (modify rows in-place)
+    rows = flag_iqr_outliers(rows)
+
     if is_format_b:
         # Exact composite key matching replaces fuzzy duplicate detection for Format B
         rows = flag_duplicates_composite(rows)
@@ -796,16 +1078,22 @@ def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
 
         results.append({
             'row_id':          row.get('row_id'),
-            'description':     row.get('description'),
+            'description':     row.get('description') or row.get('project_name'),
             'amount':          row.get('amount'),
             'location':        row.get('location'),
-            'ministry':        row.get('ministry'),
+            'ministry':        row.get('mda_name') or row.get('ministry'),
             'project_code':    row.get('project_code'),
             'is_mda_level':    row.get('is_mda_level'),
             'cluster_size':    row.get('cluster_size'),
             'flags':           flags,
-            # Format B passthrough fields
+            # Seven extracted parameters
             'mda_code':        row.get('mda_code'),
+            'mda_name':        row.get('mda_name') or row.get('ministry'),
+            'project_name':    row.get('project_name') or row.get('description'),
+            'project_status':  row.get('project_status'),
+            'expenditure_code': row.get('expenditure_code') or row.get('economic_code'),
+            'data_quality_notes': row.get('data_quality_notes'),
+            # Format B passthrough fields
             'economic_code':   row.get('economic_code'),
             'function_code':   row.get('function_code'),
             'location_code':   row.get('location_code'),
