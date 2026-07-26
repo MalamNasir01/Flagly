@@ -8,13 +8,13 @@ Flagly is a Nigerian Budget Red Flag Scanner for accountability journalists and 
 
 Every line item should carry:
 
-1. `mda_code` — administrative unit code
-2. `mda_name` — ministry / MDA name
-3. `project_code` — project or ERGP style code
-4. `project_name` — project description
-5. `project_status` — ONGOING or NEW when present
-6. `amount` — approved allocation in naira
-7. `expenditure_code` — economic / expenditure code when present
+1. `mda_code`   administrative unit code
+2. `mda_name`   ministry / MDA name
+3. `project_code`   project or ERGP style code
+4. `project_name`   project description
+5. `project_status`   ONGOING or NEW when present
+6. `amount`   approved allocation in naira
+7. `expenditure_code`   economic / expenditure code when present
 
 Where a field cannot be extracted, return null and attach a soft data quality note.
 
