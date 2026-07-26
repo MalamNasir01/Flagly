@@ -1,58 +1,675 @@
 {
-  "FEDERAL ROAD MAINTENANCE AGENCY": {
-    "aliases": ["FRMA", "FEDERAL ROADS MAINTENANCE AGENCY"],
-    "scope": ["road", "highway", "bridge", "carriageway", "asphalt", "pavement", "maintenance"]
+  "_meta": {
+    "purpose": "Seed mapping of Nigerian federal MDAs to their statutory scope. Used by the mandate mismatch flag engine. A project category found in an MDA excluded list fires a HIGH mandate mismatch flag. A project category not in scope and not in excluded is a MEDIUM flag pending review.",
+    "version": "0.1",
+    "last_updated": "2026-07-26",
+    "notes": "Expand with every MDA appearing in the 2026 FGN appropriation bill before going to a real newsroom. State-level MDA mandates are out of scope for this file and belong in a separate mda_mandates_states.json.",
+    "category_vocabulary": [
+      "roads",
+      "road_maintenance",
+      "bridges",
+      "rail",
+      "airports",
+      "ports",
+      "water_transport",
+      "housing",
+      "urban_infrastructure",
+      "health_facilities",
+      "medical_equipment",
+      "pharmaceuticals",
+      "disease_control",
+      "primary_schools",
+      "secondary_schools",
+      "tertiary_education",
+      "vocational_training",
+      "educational_materials",
+      "agriculture_inputs",
+      "irrigation",
+      "livestock",
+      "fisheries",
+      "food_storage",
+      "water_supply",
+      "sanitation",
+      "dams",
+      "electricity_generation",
+      "electricity_distribution",
+      "renewable_energy",
+      "oil_gas",
+      "solid_minerals",
+      "ict_infrastructure",
+      "broadcasting",
+      "postal_services",
+      "financial_regulation",
+      "taxation",
+      "customs",
+      "military_equipment",
+      "policing",
+      "immigration",
+      "corrections",
+      "fire_service",
+      "disaster_response",
+      "refugee_support",
+      "social_welfare",
+      "youth_programs",
+      "sports_facilities",
+      "cultural_facilities",
+      "tourism_facilities",
+      "markets",
+      "industrial_parks",
+      "trade_facilitation",
+      "environmental_protection",
+      "climate_action",
+      "forestry",
+      "gender_programs",
+      "child_welfare",
+      "labour_programs",
+      "diplomacy",
+      "justice_administration",
+      "research_development",
+      "population_data",
+      "elections",
+      "identity_management",
+      "recurrent_admin"
+    ]
   },
-  "FEDERAL MINISTRY OF WORKS": {
-    "aliases": ["MINISTRY OF WORKS", "FEDERAL MINISTRY OF WORKS AND HOUSING"],
-    "scope": ["road", "highway", "bridge", "infrastructure", "works", "housing", "building"]
-  },
-  "FEDERAL MINISTRY OF HEALTH": {
-    "aliases": ["MINISTRY OF HEALTH", "FEDERAL MINISTRY OF HEALTH AND SOCIAL WELFARE"],
-    "scope": ["health", "hospital", "medical", "clinic", "pharmaceutical", "nursing", "vaccine"]
-  },
-  "FEDERAL MINISTRY OF EDUCATION": {
-    "aliases": ["MINISTRY OF EDUCATION"],
-    "scope": ["education", "school", "university", "college", "classroom", "training", "scholarship"]
-  },
-  "FEDERAL MINISTRY OF WATER RESOURCES": {
-    "aliases": ["MINISTRY OF WATER RESOURCES", "FEDERAL MINISTRY OF WATER RESOURCES AND SANITATION"],
-    "scope": ["water", "irrigation", "dam", "sanitation", "borehole"]
-  },
-  "FEDERAL MINISTRY OF AGRICULTURE": {
-    "aliases": ["MINISTRY OF AGRICULTURE", "FEDERAL MINISTRY OF AGRICULTURE AND RURAL DEVELOPMENT", "FEDERAL MINISTRY OF AGRICULTURE AND FOOD SECURITY"],
-    "scope": ["agriculture", "farm", "livestock", "fishery", "food", "rural"]
-  },
-  "FEDERAL MINISTRY OF TRANSPORTATION": {
-    "aliases": ["MINISTRY OF TRANSPORTATION", "FEDERAL MINISTRY OF TRANSPORT"],
-    "scope": ["transport", "rail", "aviation", "maritime", "port", "road"]
-  },
-  "FEDERAL MINISTRY OF POWER": {
-    "aliases": ["MINISTRY OF POWER", "FEDERAL MINISTRY OF POWER AND STEEL"],
-    "scope": ["power", "electricity", "transmission", "generation", "grid", "energy"]
-  },
-  "STATE HOUSE": {
-    "aliases": ["STATE HOUSE - HQTRS", "STATE HOUSE OPERATIONS", "PRESIDENCY"],
-    "scope": ["presidency", "state house", "security", "protocol", "administration"]
-  },
-  "BUREAU OF PUBLIC PROCUREMENT": {
-    "aliases": ["BPP"],
-    "scope": ["procurement", "oversight", "capacity", "training", "regulation"]
-  },
-  "NIGERIAN ARMY": {
-    "aliases": ["ARMY"],
-    "scope": ["defence", "military", "security", "barracks", "armament"]
-  },
-  "NIGERIA POLICE FORCE": {
-    "aliases": ["POLICE", "NIGERIA POLICE"],
-    "scope": ["police", "security", "law enforcement", "station"]
-  },
-  "UNIVERSAL BASIC EDUCATION COMMISSION": {
-    "aliases": ["UBEC"],
-    "scope": ["education", "school", "classroom", "basic education", "teacher"]
-  },
-  "NATIONAL PRIMARY HEALTH CARE DEVELOPMENT AGENCY": {
-    "aliases": ["NPHCDA"],
-    "scope": ["health", "primary health", "clinic", "vaccine", "immunisation"]
-  }
+  "mdas": [
+    {
+      "name": "Federal Road Maintenance Agency",
+      "aliases": ["FERMA", "FRMA", "Road Maintenance Agency"],
+      "scope": ["road_maintenance", "bridges", "recurrent_admin"],
+      "excluded": [
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "health_facilities",
+        "sports_facilities",
+        "markets",
+        "housing",
+        "water_supply",
+        "electricity_generation"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Works",
+      "aliases": ["Ministry of Works", "FMW"],
+      "scope": ["roads", "road_maintenance", "bridges", "urban_infrastructure", "recurrent_admin"],
+      "excluded": [
+        "primary_schools",
+        "health_facilities",
+        "agriculture_inputs",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Health and Social Welfare",
+      "aliases": ["Ministry of Health", "FMoH", "FMOH"],
+      "scope": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "social_welfare",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "bridges",
+        "sports_facilities",
+        "markets",
+        "electricity_generation"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Education",
+      "aliases": ["Ministry of Education", "FMoE"],
+      "scope": [
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "vocational_training",
+        "educational_materials",
+        "research_development",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "health_facilities",
+        "military_equipment",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Agriculture and Food Security",
+      "aliases": ["Ministry of Agriculture", "FMARD", "Ministry of Ag"],
+      "scope": [
+        "agriculture_inputs",
+        "irrigation",
+        "livestock",
+        "fisheries",
+        "food_storage",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Defence",
+      "aliases": ["Ministry of Defence", "MoD"],
+      "scope": ["military_equipment", "recurrent_admin", "research_development"],
+      "excluded": [
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets",
+        "roads"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Water Resources and Sanitation",
+      "aliases": ["Ministry of Water Resources", "FMWR"],
+      "scope": ["water_supply", "sanitation", "dams", "irrigation", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Power",
+      "aliases": ["Ministry of Power", "FMP"],
+      "scope": [
+        "electricity_generation",
+        "electricity_distribution",
+        "renewable_energy",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "markets",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Transportation",
+      "aliases": ["Ministry of Transport", "FMT"],
+      "scope": ["rail", "water_transport", "ports", "urban_infrastructure", "recurrent_admin"],
+      "excluded": [
+        "primary_schools",
+        "health_facilities",
+        "agriculture_inputs",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Aviation and Aerospace Development",
+      "aliases": ["Ministry of Aviation"],
+      "scope": ["airports", "recurrent_admin", "research_development"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "markets",
+        "sports_facilities"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Marine and Blue Economy",
+      "aliases": ["Ministry of Marine", "Blue Economy Ministry"],
+      "scope": ["ports", "water_transport", "fisheries", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Environment",
+      "aliases": ["Ministry of Environment", "FMoE Env"],
+      "scope": [
+        "environmental_protection",
+        "climate_action",
+        "forestry",
+        "sanitation",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "military_equipment",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Finance and Coordinating Economy",
+      "aliases": ["Ministry of Finance", "FMoF"],
+      "scope": ["taxation", "customs", "financial_regulation", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Interior",
+      "aliases": ["Ministry of Interior", "FMoI"],
+      "scope": [
+        "immigration",
+        "corrections",
+        "fire_service",
+        "identity_management",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Justice",
+      "aliases": ["Ministry of Justice", "FMoJ"],
+      "scope": ["justice_administration", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Labour and Employment",
+      "aliases": ["Ministry of Labour", "FMoLE"],
+      "scope": ["labour_programs", "vocational_training", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "health_facilities",
+        "military_equipment",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Women Affairs",
+      "aliases": ["Ministry of Women Affairs", "FMWA"],
+      "scope": ["gender_programs", "child_welfare", "social_welfare", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "military_equipment",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Youth Development",
+      "aliases": ["Ministry of Youth", "FMY"],
+      "scope": ["youth_programs", "vocational_training", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "health_facilities",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Sports Development",
+      "aliases": ["Ministry of Sports"],
+      "scope": ["sports_facilities", "youth_programs", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "military_equipment",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Communications, Innovation and Digital Economy",
+      "aliases": ["Ministry of Communications", "FMCIDE"],
+      "scope": [
+        "ict_infrastructure",
+        "postal_services",
+        "research_development",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Housing and Urban Development",
+      "aliases": ["Ministry of Housing", "FMoHUD"],
+      "scope": ["housing", "urban_infrastructure", "recurrent_admin"],
+      "excluded": [
+        "primary_schools",
+        "health_facilities",
+        "military_equipment",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Industry, Trade and Investment",
+      "aliases": ["Ministry of Trade", "FMITI"],
+      "scope": [
+        "trade_facilitation",
+        "industrial_parks",
+        "markets",
+        "customs",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "primary_schools",
+        "health_facilities",
+        "military_equipment",
+        "sports_facilities"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Petroleum Resources",
+      "aliases": ["Ministry of Petroleum", "FMPR"],
+      "scope": ["oil_gas", "research_development", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Solid Minerals Development",
+      "aliases": ["Ministry of Solid Minerals", "Ministry of Mines and Steel"],
+      "scope": ["solid_minerals", "research_development", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Foreign Affairs",
+      "aliases": ["Ministry of Foreign Affairs", "MFA"],
+      "scope": ["diplomacy", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Information and National Orientation",
+      "aliases": ["Ministry of Information", "FMoI Info"],
+      "scope": ["broadcasting", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "military_equipment",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Humanitarian Affairs and Poverty Alleviation",
+      "aliases": ["Ministry of Humanitarian Affairs"],
+      "scope": [
+        "disaster_response",
+        "refugee_support",
+        "social_welfare",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "sports_facilities",
+        "military_equipment",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Science, Technology and Innovation",
+      "aliases": ["Ministry of Science and Technology", "FMSTI"],
+      "scope": ["research_development", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Ministry of Art, Culture, Tourism and Creative Economy",
+      "aliases": ["Ministry of Culture", "Ministry of Tourism"],
+      "scope": ["cultural_facilities", "tourism_facilities", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "Nigeria Police Force",
+      "aliases": ["NPF", "Police"],
+      "scope": ["policing", "military_equipment", "recurrent_admin"],
+      "excluded": [
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Road Safety Corps",
+      "aliases": ["FRSC"],
+      "scope": ["policing", "recurrent_admin"],
+      "excluded": [
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "Nigeria Ports Authority",
+      "aliases": ["NPA"],
+      "scope": ["ports", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities"
+      ]
+    },
+    {
+      "name": "Nigerian Maritime Administration and Safety Agency",
+      "aliases": ["NIMASA"],
+      "scope": ["water_transport", "ports", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities"
+      ]
+    },
+    {
+      "name": "Nigerian Civil Aviation Authority",
+      "aliases": ["NCAA"],
+      "scope": ["airports", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities"
+      ]
+    },
+    {
+      "name": "Federal Airports Authority of Nigeria",
+      "aliases": ["FAAN"],
+      "scope": ["airports", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities"
+      ]
+    },
+    {
+      "name": "Central Bank of Nigeria",
+      "aliases": ["CBN"],
+      "scope": ["financial_regulation", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "Federal Inland Revenue Service",
+      "aliases": ["FIRS"],
+      "scope": ["taxation", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "Nigerian Communications Commission",
+      "aliases": ["NCC"],
+      "scope": ["ict_infrastructure", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "National Information Technology Development Agency",
+      "aliases": ["NITDA"],
+      "scope": ["ict_infrastructure", "research_development", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "National Agency for Food and Drug Administration and Control",
+      "aliases": ["NAFDAC"],
+      "scope": ["pharmaceuticals", "disease_control", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "National Drug Law Enforcement Agency",
+      "aliases": ["NDLEA"],
+      "scope": ["policing", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "National Emergency Management Agency",
+      "aliases": ["NEMA"],
+      "scope": ["disaster_response", "refugee_support", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "Nigerian Postal Service",
+      "aliases": ["NIPOST"],
+      "scope": ["postal_services", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "Nigerian National Petroleum Company Limited",
+      "aliases": ["NNPC", "NNPCL"],
+      "scope": ["oil_gas", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "National Identity Management Commission",
+      "aliases": ["NIMC"],
+      "scope": ["identity_management", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "National Population Commission",
+      "aliases": ["NPC", "NPopC"],
+      "scope": ["population_data", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    },
+    {
+      "name": "Independent National Electoral Commission",
+      "aliases": ["INEC"],
+      "scope": ["elections", "recurrent_admin"],
+      "excluded": [
+        "roads",
+        "primary_schools",
+        "health_facilities",
+        "sports_facilities",
+        "markets"
+      ]
+    }
+  ]
 }

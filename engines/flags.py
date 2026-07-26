@@ -59,14 +59,69 @@ def _load_json(name: str, default):
         return default
 
 
-VAGUE_LOCATION_PHRASES = _load_json('vague_location_phrases.json', [
+def _normalize_vague_phrases(raw) -> list:
+    """Accept plain string lists or {_meta, phrases:[{phrase, severity}]} docs."""
+    if isinstance(raw, list):
+        items = raw
+    elif isinstance(raw, dict):
+        items = raw.get('phrases') or raw.get('vague_location_phrases') or []
+    else:
+        items = []
+    out = []
+    for item in items:
+        if isinstance(item, str):
+            out.append({'phrase': item.lower().strip(), 'severity': None, 'category': None})
+        elif isinstance(item, dict) and item.get('phrase'):
+            out.append({
+                'phrase': str(item['phrase']).lower().strip(),
+                'severity': (item.get('severity') or '').lower() or None,
+                'category': item.get('category'),
+            })
+    # Longest phrases first so "selected locations" beats "selected"
+    out.sort(key=lambda x: len(x['phrase']), reverse=True)
+    return out
+
+
+def _normalize_mda_mandates(raw) -> dict:
+    """Accept legacy name->meta maps or {_meta, mdas:[{name, aliases, scope, excluded}]}."""
+    if isinstance(raw, dict) and 'mdas' in raw:
+        items = raw.get('mdas') or []
+    elif isinstance(raw, list):
+        items = raw
+    elif isinstance(raw, dict):
+        # Legacy flat map
+        return {
+            k: v for k, v in raw.items()
+            if isinstance(v, dict) and k != '_meta'
+        }
+    else:
+        items = []
+
+    out = {}
+    for item in items:
+        if not isinstance(item, dict) or not item.get('name'):
+            continue
+        name = str(item['name']).strip()
+        out[name.upper()] = {
+            'name': name,
+            'aliases': item.get('aliases') or [],
+            'scope': item.get('scope') or [],
+            'excluded': item.get('excluded') or [],
+        }
+    return out
+
+
+VAGUE_LOCATION_PHRASE_RECORDS = _normalize_vague_phrases(_load_json('vague_location_phrases.json', [
     'selected locations', 'multiple lots', 'various states', 'nationwide',
     'geopolitical zone', 'senatorial zone', 'selected states', 'selected lgas',
     'various locations', 'across the country',
-])
+]))
+VAGUE_LOCATION_PHRASES = [r['phrase'] for r in VAGUE_LOCATION_PHRASE_RECORDS]
+VAGUE_PHRASE_SEVERITY = {r['phrase']: r.get('severity') for r in VAGUE_LOCATION_PHRASE_RECORDS}
 
-MDA_MANDATES = _load_json('mda_mandates.json', {})
+MDA_MANDATES = _normalize_mda_mandates(_load_json('mda_mandates.json', {}))
 NIGERIA_GEO = _load_json('nigeria_states_lgas.json', {'states': []})
+print(f"[flags] loaded {len(MDA_MANDATES)} MDA mandates, {len(VAGUE_LOCATION_PHRASES)} vague phrases")
 
 _STATE_NAMES = [s['name'] for s in NIGERIA_GEO.get('states', [])]
 _LGA_NAMES = [lga for s in NIGERIA_GEO.get('states', []) for lga in s.get('lgas', [])]
@@ -82,6 +137,22 @@ def _has_specific_geo(text: str) -> bool:
     if _GEO_RE and _GEO_RE.search(text):
         return True
     return False
+
+
+# Map description cues onto excluded/scope tokens used in mda_mandates.json
+_EXCLUDED_MARKERS = [
+    ('primary_schools', ['primary school', 'classroom', 'basic education']),
+    ('secondary_schools', ['secondary school', 'secondary education']),
+    ('tertiary_education', ['university', 'polytechnic', 'college of', 'nursing school', 'nursing']),
+    ('health_facilities', ['hospital', 'clinic', 'primary health', 'health centre', 'health center']),
+    ('sports_facilities', ['stadium', 'sports complex', 'sports centre', 'sports center']),
+    ('markets', ['market stall', 'market construction', 'modern market']),
+    ('housing', ['housing estate', 'residential housing', 'staff quarters']),
+    ('water_supply', ['borehole', 'water supply', 'water scheme']),
+    ('electricity_generation', ['power plant', 'electricity generation', 'solar farm']),
+    ('agriculture_inputs', ['fertilizer', 'seedling', 'farm input', 'tractor']),
+    ('military_equipment', ['armoured', 'ammunition', 'military equipment']),
+]
 
 
 # ─── Category benchmarks ──────────────────────────────────────────────────────
@@ -590,7 +661,11 @@ def flag_vague_location(row: Dict) -> Optional[Dict]:
     if _has_specific_geo(location) or _has_specific_geo(description):
         return None
 
-    severity = 'MEDIUM'
+    phrase_sev = (VAGUE_PHRASE_SEVERITY.get(matched) or '').upper()
+    if phrase_sev in ('HIGH', 'MEDIUM', 'LOW'):
+        severity = phrase_sev
+    else:
+        severity = 'MEDIUM'
     if not _is_null_amount(amount) and float(amount) >= 5_000_000:
         severity = 'HIGH'
 
@@ -719,8 +794,25 @@ def _lookup_mda_scope(mda_name: str) -> Optional[Dict]:
         return MDA_MANDATES[key]
     for name, meta in MDA_MANDATES.items():
         aliases = [a.upper() for a in meta.get('aliases', [])]
-        if key == name.upper() or key in aliases or any(a in key or key in a for a in aliases + [name.upper()]):
+        canon = (meta.get('name') or name).upper()
+        if key == name.upper() or key == canon or key in aliases or any(a in key or key in a for a in aliases + [canon]):
             return meta
+    return None
+
+
+def _match_excluded_category(description: str, excluded: list) -> Optional[str]:
+    desc_lower = description.lower()
+    excluded_set = {e.lower() for e in excluded}
+    for token, cues in _EXCLUDED_MARKERS:
+        if token not in excluded_set:
+            continue
+        if any(cue in desc_lower for cue in cues):
+            return token
+    # Also allow direct underscore token fragments in the description
+    for token in excluded_set:
+        readable = token.replace('_', ' ')
+        if readable in desc_lower:
+            return token
     return None
 
 
@@ -732,47 +824,45 @@ def flag_mandate_mismatch(row: Dict) -> Optional[Dict]:
     if not ministry or not description:
         return None
 
-    # Prefer reference table scope intersection
     meta = _lookup_mda_scope(ministry)
     if meta:
         scope = [s.lower() for s in meta.get('scope', [])]
+        excluded = [s.lower() for s in meta.get('excluded', [])]
         desc_lower = description.lower()
-        proj_cat = _match_category(description)
-        proj_keywords = []
-        if proj_cat:
-            # Expand matched category keywords
-            for keywords, _ in CATEGORY_BENCHMARKS:
-                if keywords[0] == proj_cat[0]:
-                    proj_keywords = keywords
-                    break
-        # Also check sector keywords in description
-        proj_sector = _classify_sector(description)
-        intersects = any(sk in desc_lower for sk in scope)
-        if intersects:
+
+        # In scope: skip
+        if any(sk.replace('_', ' ') in desc_lower or sk in desc_lower for sk in scope):
             return None
-        # Only fire when we can identify a clear out of scope category
-        out_of_scope_markers = ['school', 'stadium', 'nursing', 'hospital', 'classroom', 'university']
-        hit = next((m for m in out_of_scope_markers if m in desc_lower and m not in ' '.join(scope)), None)
-        if not hit and proj_sector:
-            # sector not overlapping scope words
-            if not any(proj_sector[:4] in s or s in proj_sector for s in scope):
-                hit = proj_sector
-        if not hit:
-            return None
+
+        hit = _match_excluded_category(description, excluded)
+        if hit:
+            severity = 'HIGH'
+            reason = f'listed in the MDA excluded categories ({hit})'
+        else:
+            # Not in scope and not explicitly excluded: MEDIUM pending review
+            proj_sector = _classify_sector(description)
+            if not proj_sector:
+                return None
+            if any(proj_sector[:4] in s or s in proj_sector for s in scope):
+                return None
+            hit = proj_sector
+            severity = 'MEDIUM'
+            reason = 'outside the published MDA scope and pending review'
+
         return {
             'flag_type': 'MANDATE_MISMATCH',
-            'severity': 'HIGH',
+            'severity': severity,
             'title': 'Possible Mandate Violation',
             'explanation': (
-                f'{ministry} is scoped to {", ".join(scope[:5])}, but this project describes {hit} work. '
-                f'That category does not intersect the agency functional scope in the mandate reference table. '
+                f'{ministry} is scoped to {", ".join(scope[:5]) or "its statutory functions"}, '
+                f'but this project describes {hit} work. That is {reason}. '
                 f'Request the enabling instrument or procurement plan from the MDA.'
             ),
             'evidence': {
                 'mda': ministry,
                 'scope': scope,
+                'excluded': excluded,
                 'project_marker': hit,
-                'project_category': proj_cat[0] if proj_cat else None,
             },
         }
 
