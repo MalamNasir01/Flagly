@@ -155,7 +155,7 @@ _EXCLUDED_MARKERS = [
 ]
 
 
-# ─── Category benchmarks ──────────────────────────────────────────────────────
+# ─── Category benchmarks (legacy sector cues kept for context mismatch only) ─
 
 CATEGORY_BENCHMARKS = [
     (['road', 'highway', 'carriageway', 'feeder'], 3_000_000_000),
@@ -176,16 +176,25 @@ CATEGORY_BENCHMARKS = [
     (['stadium', 'sports'],                500_000_000),
 ]
 
-FALLBACK_THRESHOLD = 1_000_000_000
-HARD_CEILING = 1_000_000_000
-
 PHYSICAL_PROJECT_KEYWORDS = [
     'construction', 'rehabilitation', 'renovation', 'procurement', 'supply',
     'establishment', 'provision', 'installation', 'repair',
 ]
 
+# Run statistics for unclassified lines (unknown category path).
+LAST_RUN_STATS: Dict = {
+    'total_items': 0,
+    'unclassified_count': 0,
+    'flagged_items': 0,
+}
+
+
+def get_last_run_stats() -> Dict:
+    return dict(LAST_RUN_STATS)
+
 
 def _match_category(description: str):
+    """Legacy helper used only by context mismatch. Prefer classify_project()."""
     if not description:
         return None
     desc_lower = description.lower()
@@ -201,146 +210,93 @@ def _has_physical_project_keyword(description: str) -> bool:
     return any(kw in desc_lower for kw in PHYSICAL_PROJECT_KEYWORDS)
 
 
-def _category_label(description: str) -> str:
-    cat = _match_category(description)
-    return cat[0] if cat else 'uncategorised'
-
-
-# ─── Flag 1: INFLATED_AMOUNT ──────────────────────────────────────────────────
+# ─── Flag 1: INFLATED_AMOUNT (relative to category benchmark) ─────────────────
 
 def flag_inflated_amount(row: Dict) -> Optional[Dict]:
-    """Hard ceiling and category benchmark checks. IQR outliers are added in batch."""
+    """Flag only when amount exceeds category benchmark * configured multiplier.
+
+    Unknown category: skip (no benchmark = no flag). No flat ₦1B fallback.
+    """
+    from engines.classifier import (
+        classify_with_match,
+        get_inflated_benchmark,
+        get_inflated_multiplier,
+        get_inflated_high_multiplier,
+    )
+
     if row.get('is_mda_level'):
         return None
     amount = row.get('amount')
     description = _str_cell(row.get('description') or row.get('project_name'))
-    if _is_null_amount(amount):
+    if _is_null_amount(amount) or not description:
         return None
     amount = float(amount)
 
-    # 3a. Hard ceiling: any item at or above ₦1B is HIGH
-    if amount >= HARD_CEILING:
-        cat = _match_category(description)
-        label = cat[0] if cat else 'this category'
-        return {
-            'flag_type': 'INFLATED_AMOUNT',
-            'severity': 'HIGH',
-            'title': 'Hard Ceiling Inflated Amount',
-            'explanation': (
-                f'This line item is priced at {_fmt_amount(amount)}. '
-                f'Any single allocation at or above NGN 1,000,000,000 triggers an automatic high risk flag. '
-                f'Cross reference the amount against BPP Price Intelligence benchmarks for {label} before drawing any conclusion.'
-            ),
-            'evidence': {
-                'rule': 'hard_ceiling',
-                'threshold': HARD_CEILING,
-                'category': label,
-                'amount': amount,
-            },
-        }
+    category, matched_kw = classify_with_match(description)
+    row['_project_category'] = category
+    row['_category_keyword'] = matched_kw
+    if not category:
+        return None
 
-    cat = _match_category(description)
-    if cat:
-        label, threshold = cat
-        if amount > threshold:
-            severity = 'HIGH' if amount > 1_000_000_000 else 'MEDIUM'
-            return {
-                'flag_type': 'INFLATED_AMOUNT',
-                'severity': severity,
-                'title': 'Inflated Amount',
-                'explanation': (
-                    f'This line item is priced at {_fmt_amount(amount)} for a {label} project. '
-                    f'The category benchmark used by the scanner is NGN {threshold:,.0f}. '
-                    f'The amount exceeds that benchmark. Cross reference against BPP Price Intelligence before publication.'
-                ),
-                'evidence': {
-                    'rule': 'category_benchmark',
-                    'category': label,
-                    'threshold': threshold,
-                    'amount': amount,
-                },
-            }
-    return None
+    benchmark = get_inflated_benchmark(category)
+    if benchmark is None or benchmark <= 0:
+        return None
+
+    multiplier = get_inflated_multiplier()
+    high_mult = get_inflated_high_multiplier()
+    threshold = benchmark * multiplier
+    high_threshold = benchmark * high_mult
+
+    if amount <= threshold:
+        return None
+
+    severity = 'HIGH' if amount > high_threshold else 'MEDIUM'
+    return {
+        'flag_type': 'INFLATED_AMOUNT',
+        'severity': severity,
+        'title': 'Inflated Amount',
+        'explanation': (
+            f'This line item is priced at {_fmt_amount(amount)} for a {category} project. '
+            f'The category benchmark is {_fmt_amount(benchmark)} and the scanner flags amounts '
+            f'above {multiplier:g} times that benchmark ({_fmt_amount(threshold)}). '
+            f'Cross reference against BPP Price Intelligence before drawing any conclusion.'
+        ),
+        'evidence': {
+            'rule': 'relative_benchmark',
+            'category': category,
+            'matched_keyword': matched_kw,
+            'benchmark': benchmark,
+            'multiplier': multiplier,
+            'threshold': threshold,
+            'amount': amount,
+        },
+    }
 
 
 def flag_iqr_outliers(rows: List[Dict]) -> List[Dict]:
-    """3b. Category relative IQR outlier detection."""
-    by_cat: Dict[str, List[Dict]] = defaultdict(list)
-    for row in rows:
-        if row.get('is_mda_level') or row.get('_exclude'):
-            continue
-        if _is_null_amount(row.get('amount')):
-            continue
-        label = _category_label(_str_cell(row.get('description') or row.get('project_name')))
-        if label == 'uncategorised':
-            continue
-        by_cat[label].append(row)
-
-    for label, members in by_cat.items():
-        if len(members) < 4:
-            continue
-        amounts = sorted(float(r['amount']) for r in members)
-        n = len(amounts)
-        q1 = amounts[n // 4]
-        q3 = amounts[(3 * n) // 4]
-        iqr = q3 - q1
-        if iqr <= 0:
-            continue
-        median = amounts[n // 2]
-        high_bound = q3 + 3 * iqr
-        med_bound = q3 + 1.5 * iqr
-
-        for row in members:
-            amt = float(row['amount'])
-            if amt <= med_bound:
-                continue
-            # Skip if a hard ceiling / benchmark flag already covers this as HIGH with higher rule priority
-            existing = [f for f in row.get('_flags', []) if f.get('flag_type') == 'INFLATED_AMOUNT']
-            if any(f.get('evidence', {}).get('rule') == 'hard_ceiling' for f in existing):
-                continue
-            severity = 'HIGH' if amt > high_bound else 'MEDIUM'
-            flag = {
-                'flag_type': 'INFLATED_AMOUNT',
-                'severity': severity,
-                'title': 'IQR Outlier Inflated Amount',
-                'explanation': (
-                    f'This line item is priced at {_fmt_amount(amt)} within the {label} category of this budget. '
-                    f'The category median is {_fmt_amount(median)}. '
-                    f'The statistical upper bound used by the scanner is {_fmt_amount(high_bound if severity == "HIGH" else med_bound)}. '
-                    f'This item sits above that bound. Cross reference the amount against BPP Price Intelligence benchmarks before drawing any conclusion.'
-                ),
-                'evidence': {
-                    'rule': 'iqr_outlier',
-                    'category': label,
-                    'median': median,
-                    'q1': q1,
-                    'q3': q3,
-                    'iqr': iqr,
-                    'medium_bound': med_bound,
-                    'high_bound': high_bound,
-                    'amount': amt,
-                },
-            }
-            # Replace weaker inflated flag or append
-            if existing:
-                row['_flags'] = [f for f in row['_flags'] if f.get('flag_type') != 'INFLATED_AMOUNT'] + [flag]
-            else:
-                row.setdefault('_flags', []).append(flag)
-
+    """IQR outlier pass disabled by default — relative benchmarks own this signal."""
     return rows
 
 
 # ─── Flag 2: CONTEXT_MISMATCH ─────────────────────────────────────────────────
 
 def flag_context_mismatch(row: Dict) -> Optional[Dict]:
+    """Disproportionate amount under ₦1B relative to legacy category cues."""
+    from engines.classifier import get_flag_config
+
     if row.get('is_mda_level'):
         return None
+    cfg = (get_flag_config().get('context_mismatch') or {})
+    if cfg.get('enabled') is False:
+        return None
+
     amount = row.get('amount')
-    description = row.get('description', '') or ''
-    if _is_null_amount(amount):
+    description = _str_cell(row.get('description') or row.get('project_name'))
+    if _is_null_amount(amount) or not description:
         return None
     amount = float(amount)
-    if amount >= 1_000_000_000:
+    under = float(cfg.get('under_amount_ngn', 1_000_000_000))
+    if amount >= under:
         return None
 
     cat = _match_category(description)
@@ -348,14 +304,15 @@ def flag_context_mismatch(row: Dict) -> Optional[Dict]:
         return None
 
     label, threshold = cat
-    if amount > threshold * 3:
+    mult = float(cfg.get('multiplier', 3.0))
+    if amount > threshold * mult:
         return {
             'flag_type': 'CONTEXT_MISMATCH',
             'severity': 'MEDIUM',
             'title': 'Context Mismatch',
             'explanation': (
                 f'Amount is disproportionate for the item category even though it falls '
-                f'below the ₦1B threshold. {_fmt_amount(amount)} for a {label} project is unusual.'
+                f'below the NGN {under:,.0f} threshold. {_fmt_amount(amount)} for a {label} project is unusual.'
             ),
         }
     return None
@@ -369,29 +326,55 @@ BROAD_VALID_LOCATION_RE = re.compile(
 )
 
 
+def _should_suppress_missing_location(description: str, category: Optional[str]) -> bool:
+    from engines.classifier import get_flag_config
+    cfg = get_flag_config().get('missing_location') or {}
+    suppress_cats = {c.lower() for c in (cfg.get('suppress_categories') or [])}
+    if category and category.lower() in suppress_cats:
+        return True
+    desc = description.lower()
+    for kw in (cfg.get('suppress_description_keywords') or []):
+        if kw.lower() in desc:
+            return True
+    return False
+
+
 def flag_missing_location(row: Dict) -> Optional[Dict]:
+    from engines.classifier import classify_project, get_flag_config
+
     if row.get('is_mda_level'):
         return None
-    description = row.get('description', '') or ''
+    description = _str_cell(row.get('description') or row.get('project_name'))
     if not _has_physical_project_keyword(description):
         return None
 
+    category = row.get('_project_category')
+    if category is None:
+        category = classify_project(description)
+        row['_project_category'] = category
+
+    if _should_suppress_missing_location(description, category):
+        return None
+
+    cfg = get_flag_config().get('missing_location') or {}
+    min_amt = float(cfg.get('min_amount_ngn', 5_000_000))
+    high_amt = float(cfg.get('high_amount_ngn', 100_000_000))
+
     location = row.get('location')
     amount = row.get('amount')
-    if _is_null_amount(amount) or float(amount) <= 5_000_000:
+    if _is_null_amount(amount) or float(amount) <= min_amt:
         return None
     amount = float(amount)
 
-    loc_str = str(location).strip() if location else ''
-    loc_lower = loc_str.lower()
-
+    loc_str = _str_cell(location)
     if BROAD_VALID_LOCATION_RE.search(loc_str) or BROAD_VALID_LOCATION_RE.search(description):
         return None
-
     if loc_str and len(loc_str) > 3:
         return None
+    if _has_specific_geo(loc_str) or _has_specific_geo(description):
+        return None
 
-    severity = 'HIGH' if amount > 100_000_000 else 'MEDIUM'
+    severity = 'HIGH' if amount > high_amt else 'MEDIUM'
     return {
         'flag_type': 'MISSING_LOCATION',
         'severity': severity,
@@ -419,81 +402,96 @@ def _has_action_verb(description: str) -> bool:
     return any(v in desc_lower for v in DUPLICATE_ACTION_VERBS)
 
 
+def _mda_key(row: Dict) -> str:
+    return _str_cell(row.get('mda_name') or row.get('ministry') or row.get('mda_code')).upper()
+
+
+def _amounts_within_tolerance(a, b, tol_pct: float) -> bool:
+    if _is_null_amount(a) or _is_null_amount(b):
+        return False
+    a, b = float(a), float(b)
+    if a == b:
+        return True
+    if tol_pct <= 0:
+        return False
+    base = max(abs(a), abs(b), 1.0)
+    return abs(a - b) / base <= (tol_pct / 100.0)
+
+
 def flag_duplicates(rows: List[Dict]) -> List[Dict]:
-    """
-    Duplicate matching with RapidFuzz token_set_ratio.
-    Similarity 95 to 100 is HIGH. Similarity 85 to 94 is MEDIUM.
-    Both paired items are flagged and carry matched counterpart evidence.
-    """
+    """Duplicates require same MDA, amount within tolerance, and high similarity."""
+    from engines.classifier import get_flag_config
+
+    cfg = get_flag_config().get('duplicates') or {}
+    high_sim = int(cfg.get('high_similarity', 98))
+    med_sim = int(cfg.get('medium_similarity', 95))
+    tol = float(cfg.get('amount_tolerance_pct', 0.0))
+    require_mda = bool(cfg.get('require_same_mda', True))
+    min_len = int(cfg.get('min_description_length', 40))
+
     candidates = [
         r for r in rows
         if _str_cell(r.get('description') or r.get('project_name'))
-        and len(_str_cell(r.get('description') or r.get('project_name'))) >= 40
+        and len(_str_cell(r.get('description') or r.get('project_name'))) >= min_len
         and not _str_cell(r.get('description') or r.get('project_name'))[0].isdigit()
         and _has_action_verb(_str_cell(r.get('description') or r.get('project_name')))
     ]
 
-    # Track best pair per row
     best_pair: Dict[int, Dict] = {}
 
     for i, row_a in enumerate(candidates):
         desc_a = _str_cell(row_a.get('description') or row_a.get('project_name'))
+        mda_a = _mda_key(row_a)
+        if require_mda and not mda_a:
+            continue
         for j in range(i + 1, len(candidates)):
             row_b = candidates[j]
+            if require_mda and _mda_key(row_b) != mda_a:
+                continue
+            if not _amounts_within_tolerance(row_a.get('amount'), row_b.get('amount'), tol):
+                continue
             desc_b = _str_cell(row_b.get('description') or row_b.get('project_name'))
             score = fuzz.token_set_ratio(desc_a, desc_b)
-            if score < 85:
+            if score < med_sim:
                 continue
-            severity = 'HIGH' if score >= 95 else 'MEDIUM'
-            pair_info_a = {
-                'score': score,
-                'severity': severity,
+            severity = 'HIGH' if score >= high_sim else 'MEDIUM'
+            pair_a = {
+                'score': score, 'severity': severity,
                 'counterpart_row_id': row_b.get('row_id'),
-                'counterpart_description': desc_b[:120],
+                'counterpart_description': desc_b,
                 'counterpart_amount': row_b.get('amount'),
                 'counterpart_code': row_b.get('project_code'),
+                '_row': row_a,
             }
-            pair_info_b = {
-                'score': score,
-                'severity': severity,
+            pair_b = {
+                'score': score, 'severity': severity,
                 'counterpart_row_id': row_a.get('row_id'),
-                'counterpart_description': desc_a[:120],
+                'counterpart_description': desc_a,
                 'counterpart_amount': row_a.get('amount'),
                 'counterpart_code': row_a.get('project_code'),
+                '_row': row_b,
             }
-            for row, info in ((row_a, pair_info_a), (row_b, pair_info_b)):
-                rid = id(row)
+            for info in (pair_a, pair_b):
+                rid = id(info['_row'])
                 prev = best_pair.get(rid)
                 if prev is None or info['score'] > prev['score']:
                     best_pair[rid] = info
-                    best_pair[rid]['_row'] = row
-
-    # Group into clusters of mutual high matches for cluster_size reporting
-    cluster_ids: Dict[int, set] = defaultdict(set)
-    for rid, info in best_pair.items():
-        row = info['_row']
-        cluster_ids[rid].add(row.get('row_id'))
-        cluster_ids[rid].add(info['counterpart_row_id'])
 
     for rid, info in best_pair.items():
         row = info['_row']
-        matched = sorted(x for x in cluster_ids[rid] if x is not None)
-        n = max(2, len(matched))
-        severity = info['severity']
-        if n > 5:
-            severity = 'HIGH'
+        matched = [row.get('row_id'), info['counterpart_row_id']]
+        matched = [x for x in matched if x is not None]
         flag = {
             'flag_type': 'DUPLICATE_CLUSTER',
-            'cluster_size': n,
+            'cluster_size': max(2, len(set(matched))),
             'matched_rows': matched,
-            'severity': severity,
-            'title': f'Duplicate Cluster ({n}x)',
+            'severity': info['severity'],
+            'title': f'Duplicate Cluster ({max(2, len(set(matched)))}x)',
             'explanation': (
-                f'This project description closely matches another line item at {info["score"]}% similarity. '
-                f'The matched counterpart is "{info["counterpart_description"]}" '
-                f'({_fmt_amount(info["counterpart_amount"])}). '
-                f'Verify these are genuinely separate projects at different locations and not the same allocation duplicated. '
-                f'File a Freedom of Information request for award history if the sites cannot be distinguished.'
+                f'This project description matches another line under the same MDA at {info["score"]}% similarity '
+                f'with the same amount ({_fmt_amount(info["counterpart_amount"])}). '
+                f'The matched counterpart is "{info["counterpart_description"]}". '
+                f'Verify these are genuinely separate projects at different locations.'
             ),
             'evidence': {
                 'similarity': info['score'],
@@ -501,14 +499,13 @@ def flag_duplicates(rows: List[Dict]) -> List[Dict]:
                 'matched_description': info['counterpart_description'],
                 'matched_amount': info['counterpart_amount'],
                 'matched_code': info['counterpart_code'],
-                'matched_rows': matched,
+                'same_mda': True,
+                'amount_tolerance_pct': tol,
             },
         }
-        # Avoid duplicate DUPLICATE_CLUSTER flags
-        existing = [f for f in row.get('_flags', []) if f.get('flag_type') == 'DUPLICATE_CLUSTER']
-        if not existing:
+        if not any(f.get('flag_type') == 'DUPLICATE_CLUSTER' for f in row.get('_flags', [])):
             row.setdefault('_flags', []).append(flag)
-            row['cluster_size'] = n
+            row['cluster_size'] = flag['cluster_size']
 
     return rows
 
@@ -646,27 +643,35 @@ def flag_ghost_projects_multiyear(year_frames: Dict[str, List[Dict]]) -> List[Di
 # ─── Flag A: VAGUE_LOCATION ───────────────────────────────────────────────────
 
 def flag_vague_location(row: Dict) -> Optional[Dict]:
+    """Phrase match on description only when no state/LGA was extracted."""
+    from engines.classifier import get_flag_config
+
     if row.get('is_mda_level'):
         return None
     description = _str_cell(row.get('description') or row.get('project_name'))
     location = _str_cell(row.get('location'))
-    combined = f'{description} {location}'.strip().lower()
     amount = row.get('amount')
+    if not description:
+        return None
 
-    matched = next((p for p in VAGUE_LOCATION_PHRASES if p in combined), None)
+    desc_lower = description.lower()
+    matched = next((p for p in VAGUE_LOCATION_PHRASES if p in desc_lower), None)
     if not matched:
         return None
 
-    # Spec: phrase present and no specific state or LGA extracted
+    # If a real location is present, do not flag even if a vague phrase appears
     if _has_specific_geo(location) or _has_specific_geo(description):
         return None
 
-    phrase_sev = (VAGUE_PHRASE_SEVERITY.get(matched) or '').upper()
-    if phrase_sev in ('HIGH', 'MEDIUM', 'LOW'):
-        severity = phrase_sev
-    else:
-        severity = 'MEDIUM'
-    if not _is_null_amount(amount) and float(amount) >= 5_000_000:
+    phrase_sev = (VAGUE_PHRASE_SEVERITY.get(matched) or 'medium').upper()
+    if phrase_sev not in ('HIGH', 'MEDIUM', 'LOW'):
+        phrase_sev = 'MEDIUM'
+    severity = phrase_sev
+
+    elevate_at = float(
+        (get_flag_config().get('vague_location') or {}).get('elevate_medium_to_high_amount_ngn', 5_000_000)
+    )
+    if severity == 'MEDIUM' and not _is_null_amount(amount) and float(amount) >= elevate_at:
         severity = 'HIGH'
 
     return {
@@ -680,6 +685,7 @@ def flag_vague_location(row: Dict) -> Optional[Dict]:
         ),
         'evidence': {
             'phrase': matched,
+            'phrase_severity': phrase_sev,
             'location': location or None,
         },
     }
@@ -800,23 +806,19 @@ def _lookup_mda_scope(mda_name: str) -> Optional[Dict]:
     return None
 
 
-def _match_excluded_category(description: str, excluded: list) -> Optional[str]:
-    desc_lower = description.lower()
+def _match_excluded_category(category: Optional[str], excluded: list) -> Optional[str]:
+    if not category:
+        return None
     excluded_set = {e.lower() for e in excluded}
-    for token, cues in _EXCLUDED_MARKERS:
-        if token not in excluded_set:
-            continue
-        if any(cue in desc_lower for cue in cues):
-            return token
-    # Also allow direct underscore token fragments in the description
-    for token in excluded_set:
-        readable = token.replace('_', ' ')
-        if readable in desc_lower:
-            return token
+    if category.lower() in excluded_set:
+        return category.lower()
     return None
 
 
 def flag_mandate_mismatch(row: Dict) -> Optional[Dict]:
+    """HIGH if category in MDA excluded; MEDIUM if neither scope nor excluded; skip if unclassified."""
+    from engines.classifier import classify_with_match
+
     if row.get('is_mda_level'):
         return None
     ministry = _str_cell(row.get('mda_name') or row.get('ministry'))
@@ -824,65 +826,50 @@ def flag_mandate_mismatch(row: Dict) -> Optional[Dict]:
     if not ministry or not description:
         return None
 
-    meta = _lookup_mda_scope(ministry)
-    if meta:
-        scope = [s.lower() for s in meta.get('scope', [])]
-        excluded = [s.lower() for s in meta.get('excluded', [])]
-        desc_lower = description.lower()
+    category = row.get('_project_category')
+    matched_kw = row.get('_category_keyword')
+    if category is None and '_project_category' not in row:
+        category, matched_kw = classify_with_match(description)
+        row['_project_category'] = category
+        row['_category_keyword'] = matched_kw
 
-        # In scope: skip
-        if any(sk.replace('_', ' ') in desc_lower or sk in desc_lower for sk in scope):
-            return None
-
-        hit = _match_excluded_category(description, excluded)
-        if hit:
-            severity = 'HIGH'
-            reason = f'listed in the MDA excluded categories ({hit})'
-        else:
-            # Not in scope and not explicitly excluded: MEDIUM pending review
-            proj_sector = _classify_sector(description)
-            if not proj_sector:
-                return None
-            if any(proj_sector[:4] in s or s in proj_sector for s in scope):
-                return None
-            hit = proj_sector
-            severity = 'MEDIUM'
-            reason = 'outside the published MDA scope and pending review'
-
-        return {
-            'flag_type': 'MANDATE_MISMATCH',
-            'severity': severity,
-            'title': 'Possible Mandate Violation',
-            'explanation': (
-                f'{ministry} is scoped to {", ".join(scope[:5]) or "its statutory functions"}, '
-                f'but this project describes {hit} work. That is {reason}. '
-                f'Request the enabling instrument or procurement plan from the MDA.'
-            ),
-            'evidence': {
-                'mda': ministry,
-                'scope': scope,
-                'excluded': excluded,
-                'project_marker': hit,
-            },
-        }
-
-    # Fallback sector classifier
-    mda_sector  = _classify_sector(ministry)
-    proj_sector = _classify_sector(description)
-    if not mda_sector or not proj_sector or mda_sector == proj_sector:
+    # Unknown category path: do not fire mismatch
+    if not category:
         return None
+
+    meta = _lookup_mda_scope(ministry)
+    if not meta:
+        return None
+
+    scope = [s.lower() for s in (meta.get('scope') or [])]
+    excluded = [s.lower() for s in (meta.get('excluded') or [])]
+    cat = category.lower()
+
+    if cat in scope:
+        return None
+
+    if cat in excluded:
+        severity = 'HIGH'
+        reason = f'listed in the MDA excluded categories ({cat})'
+    else:
+        severity = 'MEDIUM'
+        reason = 'neither in the MDA scope nor its excluded list, pending review'
 
     return {
         'flag_type': 'MANDATE_MISMATCH',
-        'severity':  'HIGH',
-        'title':     'Possible Mandate Violation',
+        'severity': severity,
+        'title': 'Possible Mandate Violation',
         'explanation': (
-            f'{ministry} is a {mda_sector} agency but this project appears to be a '
-            f'{proj_sector} project. Request the enabling instrument or procurement plan from the MDA.'
+            f'{ministry} is scoped to {", ".join(scope[:5]) or "its statutory functions"}, '
+            f'but this project was classified as {cat}. That is {reason}. '
+            f'Request the enabling instrument or procurement plan from the MDA.'
         ),
         'evidence': {
-            'mda_sector': mda_sector,
-            'project_sector': proj_sector,
+            'mda': ministry,
+            'scope': scope,
+            'excluded': excluded,
+            'project_category': cat,
+            'matched_keyword': matched_kw,
         },
     }
 
@@ -1095,11 +1082,28 @@ def flag_zero_implementation_rollover(row: Dict) -> Optional[Dict]:
 
 def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
     """Run all flag checks and return list of flagged item dicts."""
+    from engines.classifier import classify_with_match
+
+    global LAST_RUN_STATS
     rows = df.to_dict('records')
 
     for row in rows:
         row['_flags']   = []
         row['_exclude'] = False
+        desc = _str_cell(row.get('description') or row.get('project_name'))
+        cat, kw = classify_with_match(desc)
+        row['_project_category'] = cat
+        row['_category_keyword'] = kw
+
+    unclassified = sum(1 for r in rows if not r.get('_project_category') and not r.get('is_mda_level'))
+    LAST_RUN_STATS = {
+        'total_items': len(rows),
+        'unclassified_count': unclassified,
+        'flagged_items': 0,
+    }
+    if unclassified:
+        print(f"[flags] unclassified lines: {unclassified} of {len(rows)} "
+              f"({100.0 * unclassified / max(len(rows), 1):.1f}%)")
 
     # Detect Format B (Niger State): has mda_code values
     is_format_b = (
@@ -1107,7 +1111,7 @@ def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
         and df['mda_code'].notna().any()
     )
 
-    all_descriptions = [r.get('description', '') or '' for r in rows]
+    all_descriptions = [_str_cell(r.get('description') or r.get('project_name')) for r in rows]
 
     # Per-row flags — universal
     for row in rows:
@@ -1150,7 +1154,6 @@ def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
     rows = flag_iqr_outliers(rows)
 
     if is_format_b:
-        # Exact composite key matching replaces fuzzy duplicate detection for Format B
         rows = flag_duplicates_composite(rows)
     else:
         rows = flag_duplicates(rows)
@@ -1176,14 +1179,13 @@ def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
             'is_mda_level':    row.get('is_mda_level'),
             'cluster_size':    row.get('cluster_size'),
             'flags':           flags,
-            # Seven extracted parameters
+            'project_category': row.get('_project_category'),
             'mda_code':        row.get('mda_code'),
             'mda_name':        row.get('mda_name') or row.get('ministry'),
             'project_name':    row.get('project_name') or row.get('description'),
             'project_status':  row.get('project_status'),
             'expenditure_code': row.get('expenditure_code') or row.get('economic_code'),
             'data_quality_notes': row.get('data_quality_notes'),
-            # Format B passthrough fields
             'economic_code':   row.get('economic_code'),
             'function_code':   row.get('function_code'),
             'location_code':   row.get('location_code'),
@@ -1193,4 +1195,5 @@ def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
             'budget_2026':     row.get('budget_2026'),
         })
 
+    LAST_RUN_STATS['flagged_items'] = len(results)
     return results

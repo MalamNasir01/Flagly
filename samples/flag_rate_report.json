@@ -1,0 +1,36 @@
+{
+  "sample": "samples/real_2026_fgn_slice.csv — 1000 rows, every-Nth from full 17,873-row parse of 2026 Appropriation Bill Details.pdf (real data, not hand-built)",
+  "before": {
+    "total_items": 1000,
+    "flagged_items": 312,
+    "flag_rate_pct": 31.2,
+    "per_flag": {
+      "INFLATED_AMOUNT": 51,
+      "MISSING_LOCATION": 230,
+      "DUPLICATE_CLUSTER": 66
+    },
+    "note": "Legacy approximation on the same real slice: hard ₦1B inflate ceiling + loose missing-location + token_set≥85 duplicates (any MDA). Not the live UI ~53% figure, which used a different corpus/run."
+  },
+  "after": {
+    "total_items": 1000,
+    "flagged_items": 116,
+    "flag_rate_pct": 11.6,
+    "unclassified_count": 648,
+    "unclassified_pct": 64.8,
+    "per_flag": {
+      "INFLATED_AMOUNT": 12,
+      "VAGUE_LOCATION": 47,
+      "MISSING_LOCATION": 56,
+      "CONTEXT_MISMATCH": 21,
+      "GHOST_PROJECT": 3
+    },
+    "high": 29,
+    "medium": 81,
+    "low": 6
+  },
+  "decisions": {
+    "classifier": "deterministic keyword→category map in data/category_keywords.json; case-insensitive; tie-break = longest matching keyword, then vocabulary order",
+    "unknown_category": "skip inflated + mandate; report unclassified_count",
+    "duplicates": "same MDA + amount_tolerance_pct 0% + high similarity (98/95)"
+  }
+}

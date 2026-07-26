@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 import pandas as pd
 
 from engines.parser import parse_file
-from engines.flags import run_all_flags, flag_ghost_projects_multiyear
+from engines.flags import run_all_flags, flag_ghost_projects_multiyear, get_last_run_stats
 from engines.scorer import score_items
 from engines.query import generate_narratives, answer_question, visuals_payload, safe_float
 
@@ -113,6 +113,7 @@ def summarize_scan(df: pd.DataFrame, results: List[Dict]) -> Dict[str, Any]:
     medium_risk = sum(1 for r in results if r.get("risk_level") == "MEDIUM")
     low_risk = sum(1 for r in results if r.get("risk_level") == "LOW")
     at_risk_amount = sum(safe_float(r.get("amount") or 0) for r in results)
+    stats = get_last_run_stats()
     return {
         "total_items": total_items,
         "flagged_items": len(results),
@@ -123,6 +124,8 @@ def summarize_scan(df: pd.DataFrame, results: List[Dict]) -> Dict[str, Any]:
         "total_amount": total_amount,
         "flag_summary": build_flag_summary(results),
         "results": results,
+        "unclassified_count": stats.get("unclassified_count", 0),
+        "flag_rate": (len(results) / total_items) if total_items else 0.0,
     }
 
 

@@ -69,7 +69,7 @@ _NIGERIA_STATES_RE = re.compile(
     re.IGNORECASE,
 )
 
-MAX_ROWS_FORMAT_C = 5_000
+MAX_ROWS_FORMAT_C = None  # No row cap — scan full federal project-level PDFs end to end.
 
 
 # ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -567,7 +567,7 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
                 rows.append(row_dict)
                 prev_row = row_dict
 
-                if len(rows) >= MAX_ROWS_FORMAT_C:
+                if MAX_ROWS_FORMAT_C is not None and len(rows) >= MAX_ROWS_FORMAT_C:
                     print(f"[parser] Format C: row cap {MAX_ROWS_FORMAT_C} reached")
                     return _finalize_df(rows)
 

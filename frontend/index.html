@@ -186,7 +186,7 @@ tbody td{padding:11px 12px;font-size:12px;vertical-align:middle}
 .td-mda{max-width:100px;color:var(--ink-600);font-size:11px}
 .td-mda span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .td-desc{font-weight:500;max-width:220px}
-.td-desc span{display:block;white-space:nowrap;overflow:ellipsis;text-overflow:ellipsis;overflow:hidden}
+.td-desc span{display:block;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35}
 .td-amount{font-weight:600;white-space:nowrap}
 .td-loc{color:var(--ink-600);font-size:11px;max-width:90px}
 .td-loc span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -950,7 +950,7 @@ function openDetail(rowIndex) {
     if (f.evidence) extra += `<div class="flag-evidence">${esc(f.evidence)}</div>`;
     if (f.flag_type === 'BUDGET_SPLITTING' && Array.isArray(f.split_items) && f.split_items.length) {
       extra += `<table class="split-table"><thead><tr><th>Code</th><th>Description</th><th>Amount</th></tr></thead><tbody>${
-        f.split_items.map(si => `<tr><td>${esc(si.code||'n/a')}</td><td>${esc((si.description||'').slice(0,55))}</td><td>${fmtNGN(si.amount)}</td></tr>`).join('')
+        f.split_items.map(si => `<tr><td>${esc(si.code||'n/a')}</td><td>${esc(si.description||'')}</td><td>${fmtNGN(si.amount)}</td></tr>`).join('')
       }</tbody></table>`;
     }
     const linkHtml = links.map(l => `<a class="cross-link" href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join('');
@@ -1187,8 +1187,11 @@ function downloadPDF() {
     doc.line(M,y+2,W-M,y+2); return y+10;
   }
   function tr(s,max){
-    if(!s||s==='undefined')return 'n/a';
-    const str=String(s); return str.length>max?str.slice(0,max-1)+'…':str;
+    if(!s&&s!==0)return 'n/a';
+    return String(s);
+  }
+  function wrapText(s,width){
+    return doc.splitTextToSize(String(s||'n/a'), width);
   }
   function fmtP(v){
     if(v==null||isNaN(Number(v)))return 'n/a';
@@ -1267,14 +1270,16 @@ function downloadPDF() {
   cy+=10; cy=sectionHeader('Top 10 Most Suspicious Items',cy);
   [...allResults].sort((a,b)=>(b.risk_score||0)-(a.risk_score||0)).slice(0,10).forEach((r,i)=>{
     const rt=riskText(r.risk_level);
-    setFill(i%2===0?C.rowBg:C.white);doc.rect(M,cy,CW,8.5,'F');
-    setDraw(C.border);doc.rect(M,cy,CW,8.5,'S');
+    const descLines=wrapText((i+1)+'. '+(r.description||'n/a'), CW-28);
+    const blockH=Math.max(10, 4+descLines.length*4+5);
+    setFill(i%2===0?C.rowBg:C.white);doc.rect(M,cy,CW,blockH,'F');
+    setDraw(C.border);doc.rect(M,cy,CW,blockH,'S');
     doc.setFont('helvetica','bold');doc.setFontSize(7.5);setCol(C.black);
-    doc.text((i+1)+'. '+tr(r.description,55),M+3,cy+3.5);
+    doc.text(descLines,M+3,cy+4);
     doc.setFont('helvetica','normal');setCol(C.muted);
-    doc.text(fmtP(r.amount)+'  ·  '+tr(r.location||'n/a',20),M+3,cy+7);
+    doc.text(fmtP(r.amount)+'  ·  '+(r.location||'n/a'),M+3,cy+blockH-2.5);
     doc.setFont('helvetica','bold');setCol(rt.col);doc.text(rt.label,M+CW-3,cy+5,{align:'right'});
-    cy+=8.5;
+    cy+=blockH;
   });
   footer(pn);
 
@@ -1299,20 +1304,24 @@ function downloadPDF() {
     items.forEach(r=>{
       const flag=(r.flags||[]).find(f=>f.flag_type===cat.key);
       const rt=riskText(r.risk_level);
-      const cardH=32;
+      const descLines=wrapText(r.description||'n/a', CW-12);
+      const explLines=flag&&flag.explanation?wrapText(flag.explanation, CW-12):[];
+      const cardH=Math.max(28, 14+descLines.length*4+explLines.length*3.8+8);
+      if(cy2+cardH>H-20){footer(pn);doc.addPage();pn++;setFill(C.white);doc.rect(0,0,W,H,'F');setFill(C.red);doc.rect(0,0,W,8,'F');doc.setFontSize(8);doc.setFont('helvetica','bold');setCol(C.white);doc.text('Flagly · Budget Red Flag Scan Report · '+yr,M,5.5);cy2=16;}
       setFill(C.rowBg);setDraw(C.border);doc.setLineWidth(0.3);
       doc.roundedRect(M,cy2,CW,cardH,2,2,'FD');
       setFill(rt.col);doc.rect(M,cy2,1.8,cardH,'F');
       doc.setFont('helvetica','bold');doc.setFontSize(8.5);setCol(C.black);
-      doc.text(tr(r.description,90),M+5,cy2+7);
+      doc.text(descLines,M+5,cy2+7);
+      let ty=cy2+7+descLines.length*4;
       doc.setFont('helvetica','normal');doc.setFontSize(7.5);setCol(C.muted);
-      doc.text('Amount: '+fmtP(r.amount),M+5,cy2+13.5);
-      doc.text('Location: '+tr(r.location||'n/a',30),M+5,cy2+19);
+      doc.text('Amount: '+fmtP(r.amount),M+5,ty+1);
+      doc.text('Location: '+(r.location||'n/a'),M+5,ty+6);
       doc.setFont('helvetica','bold');doc.setFontSize(8);setCol(rt.col);
       doc.text(rt.label,M+CW-3,cy2+7,{align:'right'});
-      if(flag&&flag.explanation){
+      if(explLines.length){
         doc.setFont('helvetica','italic');doc.setFontSize(7);setCol(C.body);
-        doc.text(tr(flag.explanation,120),M+5,cy2+25.5);
+        doc.text(explLines,M+5,ty+12);
       }
       cy2+=cardH+5;
     });
