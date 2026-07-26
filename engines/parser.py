@@ -225,16 +225,22 @@ def _parse_pdf_format_a(contents: bytes) -> pd.DataFrame:
                             # NO | CODE | MDA | PERSONNEL | OVERHEAD | CAPITAL | TOTAL
                             overhead_val = _to_float(row[4]) if len(row) >= 7 else None
                             capital_val  = _to_float(row[5]) if len(row) >= 7 else None
+                            mda_code_val = str(row[1] or '').strip() if len(row) > 1 else None
                             rows.append({
-                                'row_id':          None,
-                                'description':     mda_name,
-                                'amount':          amount_val,
-                                'location':        mda_name,
-                                'ministry':        mda_name,
-                                'project_code':    str(row[1] or '').strip() if len(row) > 1 else None,
-                                'is_mda_level':    True,
-                                'overhead_amount': overhead_val,
-                                'capital_amount':  capital_val,
+                                'row_id':            None,
+                                'description':       mda_name,
+                                'amount':            amount_val,
+                                'location':          mda_name,
+                                'ministry':          mda_name,
+                                'project_code':      mda_code_val,
+                                'is_mda_level':      True,
+                                'overhead_amount':   overhead_val,
+                                'capital_amount':    capital_val,
+                                'mda_code':          mda_code_val,
+                                'mda_name':          mda_name,
+                                'project_name':      mda_name,
+                                'project_status':    None,
+                                'expenditure_code':  None,
                             })
                 except Exception:
                     continue
@@ -280,14 +286,20 @@ def _parse_pdf_format_a_text(contents: bytes) -> pd.DataFrame:
         if len(mda_name) < 3:
             continue
         code_m = ERGP_CODE_RE.search(stripped)
+        code_val = code_m.group(1) if code_m else None
         rows.append({
             'row_id': None,
             'description': mda_name,
             'amount': amount_val,
             'location': mda_name,
             'ministry': mda_name,
-            'project_code': code_m.group(1) if code_m else None,
+            'project_code': code_val,
             'is_mda_level': True,
+            'mda_code': code_val,
+            'mda_name': mda_name,
+            'project_name': mda_name,
+            'project_status': None,
+            'expenditure_code': None,
         })
 
     return _finalize_df(rows)
@@ -370,6 +382,10 @@ def _parse_pdf_format_b(contents: bytes) -> pd.DataFrame:
             'is_mda_level':    False,
             # Format B structural codes
             'mda_code':        mda_code_val,
+            'mda_name':        None,
+            'project_name':    description,
+            'project_status':  None,
+            'expenditure_code': economic_code_val,
             'economic_code':   economic_code_val,
             'function_code':   function_code_val,
             'location_code':   location_code_val,
@@ -449,6 +465,7 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
     rows = []
     current_ministry = None
     current_mda_code = None
+    current_expenditure_code = None
     pages_parsed = 0
 
     for page_text in pages:
@@ -476,6 +493,7 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
             if section_m:
                 current_mda_code = section_m.group(1).strip()
                 current_ministry = section_m.group(2).strip()[:120]
+                current_expenditure_code = None
                 prev_row = None
                 continue
 
@@ -484,7 +502,12 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
                 continue
             if re.match(r'^(CODE|S/?N|TYPE|AMOUNT|PROJECT\s+NAME)\b', stripped, re.I):
                 continue
-            if EXPENDITURE_CODE_RE.match(stripped):
+            exp_m = re.match(r'^(21|22|23)\d{0,4}\b', stripped)
+            if exp_m:
+                # Capture expenditure code (Personnel/Overhead/Capital) for following projects
+                code_tok = stripped.split()[0]
+                if re.match(r'^(21|22|23)\d{0,6}$', code_tok):
+                    current_expenditure_code = code_tok
                 continue  # Skip Personnel (21xx), Overhead (22xx), Capital (23xx) sub-lines
 
             # ── Project line? ─────────────────────────────────────────────────
@@ -501,14 +524,18 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
                     remainder.strip(),
                     re.IGNORECASE,
                 )
+                status_val = None
                 if full_m:
                     desc_part  = full_m.group(1).strip().rstrip('.,')
+                    status_val = full_m.group(2).upper()
                     amount_val = _to_float(full_m.group(3))
                 else:
                     # Fallback: type keyword present but amount may be on a later line,
                     # or amount is missing — keep description, amount stays None
                     type_m = TYPE_RE_C.search(remainder)
                     desc_part  = (remainder[:type_m.start()] if type_m else remainder).strip().rstrip('.,')
+                    if type_m:
+                        status_val = type_m.group(1).upper()
                     # Last numeric-looking token
                     amount_val = None
                     for tok in reversed(remainder.split()):
@@ -524,13 +551,18 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
                 location = _extract_location_c(desc_part)
 
                 row_dict = {
-                    'row_id':        None,
-                    'description':   desc_part[:200],
-                    'amount':        amount_val,
-                    'location':      location,
-                    'ministry':      current_ministry,
-                    'project_code':  code,
-                    'is_mda_level':  False,
+                    'row_id':           None,
+                    'description':      desc_part[:200],
+                    'amount':           amount_val,
+                    'location':         location,
+                    'ministry':         current_ministry,
+                    'project_code':     code,
+                    'is_mda_level':     False,
+                    'mda_code':         current_mda_code,
+                    'mda_name':         current_ministry,
+                    'project_name':     desc_part[:200],
+                    'project_status':   status_val,
+                    'expenditure_code': current_expenditure_code,
                 }
                 rows.append(row_dict)
                 prev_row = row_dict
@@ -712,6 +744,11 @@ def _extract_positional(raw: pd.DataFrame) -> pd.DataFrame:
             'ministry':     None,
             'project_code': None,
             'is_mda_level': False,
+            'mda_code':     None,
+            'mda_name':     None,
+            'project_name': desc[:200],
+            'project_status': None,
+            'expenditure_code': None,
         })
 
     return _finalize_df(rows)
@@ -792,20 +829,35 @@ def _auto_detect_columns(df: pd.DataFrame) -> pd.DataFrame:
     amount_kw = ['approved budget', 'total allocation', 'amount', 'approved',
                  'allocation', 'total', 'estimate', 'proposed', 'budget',
                  'capital', 'overhead']
-    desc_kw   = ['description', 'project', 'item', 'activity', 'mda',
-                 'administrative unit', 'particular', 'detail', 'name']
+    # Prefer explicit name columns before generic 'project' / 'code' matches.
+    desc_kw   = ['project name', 'project description', 'description', 'line item',
+                 'item', 'activity', 'particular', 'detail']
     loc_kw    = ['location', 'state', 'lga', 'constituency', 'ward', 'zone']
+    mda_kw    = ['mda name', 'ministry', 'administrative unit', 'agency', 'mda']
+    code_kw   = ['project code', 'ergp', 'code']
+    status_kw = ['project status', 'status', 'project type', 'type']
+    exp_kw    = ['expenditure code', 'economic code', 'economic', 'expenditure']
 
-    def first_match(keywords):
+    def first_match(keywords, exclude_substrings=None):
+        exclude_substrings = exclude_substrings or []
         for kw in keywords:
             for col, cl in cols_lower.items():
-                if kw in cl:
+                if any(ex in cl for ex in exclude_substrings):
+                    continue
+                if kw == cl or kw in cl:
                     return col
         return None
 
     amount_col = first_match(amount_kw)
-    desc_col   = first_match(desc_kw)
+    desc_col   = first_match(desc_kw, exclude_substrings=['code', 'status'])
+    if desc_col is None:
+        # Fallback: columns named simply "project" or "name"
+        desc_col = first_match(['project', 'name', 'mda'], exclude_substrings=['code', 'status'])
     loc_col    = first_match(loc_kw)
+    mda_col    = first_match(mda_kw, exclude_substrings=['code'])
+    code_col   = first_match(code_kw)
+    status_col = first_match(status_kw)
+    exp_col    = first_match(exp_kw)
 
     # Without at least a description or amount column there's nothing to analyse.
     if desc_col is None and amount_col is None:
@@ -816,10 +868,29 @@ def _auto_detect_columns(df: pd.DataFrame) -> pd.DataFrame:
         desc       = str(row[desc_col]).strip() if desc_col is not None else ''
         amount_val = _to_float(row[amount_col]) if amount_col is not None else None
         location   = str(row[loc_col]).strip() if loc_col is not None else None
+        mda_name   = str(row[mda_col]).strip() if mda_col is not None else None
+        proj_code  = str(row[code_col]).strip() if code_col is not None else None
+        status     = str(row[status_col]).strip().upper() if status_col is not None else None
+        exp_code   = str(row[exp_col]).strip() if exp_col is not None else None
         if desc.lower() in ('', 'nan', 'none'):
             desc = ''
         if location is not None and location.lower() in ('', 'nan', 'none'):
             location = None
+        if mda_name is not None and mda_name.lower() in ('', 'nan', 'none'):
+            mda_name = None
+        if proj_code is not None and proj_code.lower() in ('', 'nan', 'none'):
+            proj_code = None
+        if status is not None and status.lower() in ('', 'nan', 'none'):
+            status = None
+        elif status and status not in ('ONGOING', 'NEW'):
+            if 'ONGOING' in status:
+                status = 'ONGOING'
+            elif 'NEW' in status:
+                status = 'NEW'
+            else:
+                status = None
+        if exp_code is not None and exp_code.lower() in ('', 'nan', 'none'):
+            exp_code = None
         # Skip aggregate/summary rows so they don't double-count amounts.
         if re.match(r'^(grand\s+)?(sub[\s\-]?)?total\b', desc.strip(), re.I):
             continue
@@ -828,9 +899,15 @@ def _auto_detect_columns(df: pd.DataFrame) -> pd.DataFrame:
             'description':  desc,
             'amount':       amount_val,
             'location':     location,
-            'ministry':     None,
-            'project_code': None,
+            'ministry':     mda_name,
+            'project_code': proj_code,
             'is_mda_level': False,
+            'mda_code':     None,
+            'mda_name':     mda_name,
+            'project_name': desc,
+            'project_status': status,
+            'expenditure_code': exp_code,
+            'economic_code': exp_code,
         })
 
     return _finalize_df(rows)
@@ -898,7 +975,11 @@ def _pdftotext(contents: bytes, timeout: int = 120) -> Optional[str]:
 
 
 def _finalize_df(rows: list) -> pd.DataFrame:
-    """Post-processing: drop short descriptions, normalize NaN, assign row_id."""
+    """Post-processing: drop short descriptions, normalize NaN, assign row_id.
+
+    Ensures the seven extracted parameters are always present:
+      mda_code, mda_name, project_code, project_name, project_status, amount, expenditure_code
+    """
     if not rows:
         return pd.DataFrame()
 
@@ -906,14 +987,39 @@ def _finalize_df(rows: list) -> pd.DataFrame:
         'row_id', 'description', 'amount', 'location',
         'ministry', 'project_code', 'is_mda_level',
         'overhead_amount', 'capital_amount',
+        # Seven extracted parameters (+ aliases kept for compatibility)
+        'mda_code', 'mda_name', 'project_name', 'project_status', 'expenditure_code',
         # Format B structural codes
-        'mda_code', 'economic_code', 'function_code', 'location_code',
+        'economic_code', 'function_code', 'location_code',
         # Format B year-over-year amounts
         'actuals_2024', 'budget_2025', 'performance_2025', 'budget_2026',
+        # Soft data-quality notes when fields are missing
+        'data_quality_notes',
     ]
     for r in rows:
         for c in all_cols:
             r.setdefault(c, None)
+        # Backfill seven-parameter aliases from legacy columns
+        if not r.get('mda_name'):
+            r['mda_name'] = r.get('ministry')
+        if not r.get('project_name'):
+            r['project_name'] = r.get('description')
+        if not r.get('expenditure_code'):
+            r['expenditure_code'] = r.get('economic_code')
+        if not r.get('ministry') and r.get('mda_name'):
+            r['ministry'] = r['mda_name']
+        notes = []
+        if not r.get('mda_code'):
+            notes.append('mda_code missing')
+        if not r.get('mda_name'):
+            notes.append('mda_name missing')
+        if not r.get('project_code'):
+            notes.append('project_code missing')
+        if not r.get('project_status'):
+            notes.append('project_status missing')
+        if not r.get('expenditure_code'):
+            notes.append('expenditure_code missing')
+        r['data_quality_notes'] = '; '.join(notes) if notes else None
 
     df = pd.DataFrame(rows, columns=all_cols)
 

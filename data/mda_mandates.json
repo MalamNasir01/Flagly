@@ -1,0 +1,58 @@
+{
+  "FEDERAL ROAD MAINTENANCE AGENCY": {
+    "aliases": ["FRMA", "FEDERAL ROADS MAINTENANCE AGENCY"],
+    "scope": ["road", "highway", "bridge", "carriageway", "asphalt", "pavement", "maintenance"]
+  },
+  "FEDERAL MINISTRY OF WORKS": {
+    "aliases": ["MINISTRY OF WORKS", "FEDERAL MINISTRY OF WORKS AND HOUSING"],
+    "scope": ["road", "highway", "bridge", "infrastructure", "works", "housing", "building"]
+  },
+  "FEDERAL MINISTRY OF HEALTH": {
+    "aliases": ["MINISTRY OF HEALTH", "FEDERAL MINISTRY OF HEALTH AND SOCIAL WELFARE"],
+    "scope": ["health", "hospital", "medical", "clinic", "pharmaceutical", "nursing", "vaccine"]
+  },
+  "FEDERAL MINISTRY OF EDUCATION": {
+    "aliases": ["MINISTRY OF EDUCATION"],
+    "scope": ["education", "school", "university", "college", "classroom", "training", "scholarship"]
+  },
+  "FEDERAL MINISTRY OF WATER RESOURCES": {
+    "aliases": ["MINISTRY OF WATER RESOURCES", "FEDERAL MINISTRY OF WATER RESOURCES AND SANITATION"],
+    "scope": ["water", "irrigation", "dam", "sanitation", "borehole"]
+  },
+  "FEDERAL MINISTRY OF AGRICULTURE": {
+    "aliases": ["MINISTRY OF AGRICULTURE", "FEDERAL MINISTRY OF AGRICULTURE AND RURAL DEVELOPMENT", "FEDERAL MINISTRY OF AGRICULTURE AND FOOD SECURITY"],
+    "scope": ["agriculture", "farm", "livestock", "fishery", "food", "rural"]
+  },
+  "FEDERAL MINISTRY OF TRANSPORTATION": {
+    "aliases": ["MINISTRY OF TRANSPORTATION", "FEDERAL MINISTRY OF TRANSPORT"],
+    "scope": ["transport", "rail", "aviation", "maritime", "port", "road"]
+  },
+  "FEDERAL MINISTRY OF POWER": {
+    "aliases": ["MINISTRY OF POWER", "FEDERAL MINISTRY OF POWER AND STEEL"],
+    "scope": ["power", "electricity", "transmission", "generation", "grid", "energy"]
+  },
+  "STATE HOUSE": {
+    "aliases": ["STATE HOUSE - HQTRS", "STATE HOUSE OPERATIONS", "PRESIDENCY"],
+    "scope": ["presidency", "state house", "security", "protocol", "administration"]
+  },
+  "BUREAU OF PUBLIC PROCUREMENT": {
+    "aliases": ["BPP"],
+    "scope": ["procurement", "oversight", "capacity", "training", "regulation"]
+  },
+  "NIGERIAN ARMY": {
+    "aliases": ["ARMY"],
+    "scope": ["defence", "military", "security", "barracks", "armament"]
+  },
+  "NIGERIA POLICE FORCE": {
+    "aliases": ["POLICE", "NIGERIA POLICE"],
+    "scope": ["police", "security", "law enforcement", "station"]
+  },
+  "UNIVERSAL BASIC EDUCATION COMMISSION": {
+    "aliases": ["UBEC"],
+    "scope": ["education", "school", "classroom", "basic education", "teacher"]
+  },
+  "NATIONAL PRIMARY HEALTH CARE DEVELOPMENT AGENCY": {
+    "aliases": ["NPHCDA"],
+    "scope": ["health", "primary health", "clinic", "vaccine", "immunisation"]
+  }
+}
