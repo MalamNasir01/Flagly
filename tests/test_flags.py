@@ -74,7 +74,7 @@ class InflatedAmountTests(unittest.TestCase):
         self.assertIsNone(flag_inflated_amount(row))
 
     def test_unknown_category_skips_inflated(self):
-        row = _row(description='Miscellaneous administrative contingency pool', amount=9_000_000_000)
+        row = _row(description='Miscellaneous contingency pool item XYZ', amount=9_000_000_000)
         self.assertIsNone(flag_inflated_amount(row))
 
     def test_relative_benchmark_flags_extreme(self):
@@ -303,6 +303,118 @@ class FormatCSectionHeaderTests(unittest.TestCase):
         # Would match the shape but should be rejected by reject regex when used together
         name = 'SOME PROJECT TITLE ONGOING 1,000,000.00'
         self.assertTrue(FORMAT_C_SECTION_REJECT_RE.search(name))
+
+
+class DisambiguationTests(unittest.TestCase):
+    def test_direct_labour_not_labour_programs(self):
+        from engines.classifier import classify_with_match, reload_classifier_data
+        reload_classifier_data()
+        cat, kw = classify_with_match(
+            'CONSTRUCTION/RENOVATION OF STAFF QUARTERS THROUGH DIRECT LABOUR'
+        )
+        self.assertNotEqual(cat, 'labour_programs')
+        self.assertEqual(cat, 'housing')
+
+    def test_labour_room_is_health(self):
+        from engines.classifier import classify_project, reload_classifier_data
+        reload_classifier_data()
+        self.assertEqual(
+            classify_project('Construction of labour room and maternity ward'),
+            'health_facilities',
+        )
+
+    def test_short_keyword_not_substring_false_positive(self):
+        from engines.classifier import classify_with_match, reload_classifier_data
+        reload_classifier_data()
+        # "hiv" must not match inside "archived"
+        cat, kw = classify_with_match(
+            'DIGITALISATION OF RECORDS NAFRC PARTICIPANTS/ARCHIVED AND STORAGE'
+        )
+        self.assertNotEqual(kw, 'hiv')
+        self.assertNotEqual(cat, 'disease_control')
+
+    def test_solar_lights_beats_installation_of_catchall(self):
+        from engines.classifier import classify_with_match, reload_classifier_data
+        reload_classifier_data()
+        cat, kw = classify_with_match(
+            "PROCUREMENT AND INSTALLATION OF SOLAR LIGHTS IN NEW CADETS' TRAINING SITES"
+        )
+        self.assertEqual(cat, 'renewable_energy')
+        self.assertIn('solar', kw)
+
+
+class AggregateInflationTests(unittest.TestCase):
+    def test_nationwide_programme_exempt_from_inflation(self):
+        row = _row(
+            description='Youth empowerment programmes across the nation wide for payments',
+            amount=14_000_000_000,
+            location=None,
+            mda_name='FEDERAL MINISTRY OF YOUTH DEVELOPMENT',
+        )
+        self.assertIsNone(flag_inflated_amount(row))
+        self.assertTrue(row.get('_inflation_exempt'))
+
+    def test_army_barracks_across_all_exempt(self):
+        row = _row(
+            description='CONSTRUCTION OF RESIDENTIAL ACCOMMODATION FOR OFFICERS AND SOLDIERS ACROSS NIGERIAN ARMY BARRACKS',
+            amount=44_000_000_000,
+            mda_name='NIGERIAN ARMY',
+        )
+        self.assertIsNone(flag_inflated_amount(row))
+
+
+class GhostYearRangeTests(unittest.TestCase):
+    def test_active_plan_range_not_ghost(self):
+        from engines.flags import flag_ghost_project
+        row = _row(
+            description='Mid-term review of National Medical Laboratory Strategic Plan (2023–2027)',
+            amount=50_000_000,
+            mda_name='FEDERAL MINISTRY OF HEALTH',
+        )
+        self.assertIsNone(flag_ghost_project(row, [row['description']], '2026'))
+
+    def test_ascii_hyphen_range_not_ghost(self):
+        from engines.flags import flag_ghost_project
+        row = _row(
+            description='Mid-term review of National Medical Laboratory Strategic Plan (2023-2027)',
+            amount=50_000_000,
+        )
+        self.assertIsNone(flag_ghost_project(row, [row['description']], '2026'))
+
+    def test_genuinely_past_year_still_flags(self):
+        from engines.flags import flag_ghost_project
+        row = _row(
+            description='Completion of abandoned 2019 BUDGET classroom block project',
+            amount=80_000_000,
+        )
+        flag = flag_ghost_project(row, [row['description']], '2026')
+        self.assertIsNotNone(flag)
+        self.assertEqual(flag['flag_type'], 'GHOST_PROJECT')
+
+
+class MandateSeveritySplitTests(unittest.TestCase):
+    def test_excluded_is_high(self):
+        # FERMA excluded includes sports_facilities
+        row = _row(
+            description='Construction of sports complex pavilion',
+            amount=200_000_000,
+            mda_name='Federal Road Maintenance Agency',
+        )
+        flag = flag_mandate_mismatch(row)
+        self.assertIsNotNone(flag)
+        self.assertEqual(flag['severity'], 'HIGH')
+        self.assertEqual(flag['evidence']['mismatch_kind'], 'excluded')
+
+    def test_not_in_scope_is_medium(self):
+        row = _row(
+            description='Supply & Installation of Solar Street Lights',
+            amount=250_000_000,
+            mda_name='Federal Road Maintenance Agency',
+        )
+        flag = flag_mandate_mismatch(row)
+        self.assertIsNotNone(flag)
+        self.assertEqual(flag['severity'], 'MEDIUM')
+        self.assertEqual(flag['evidence']['mismatch_kind'], 'not_in_scope')
 
 
 if __name__ == '__main__':

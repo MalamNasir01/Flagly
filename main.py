@@ -66,6 +66,8 @@ EMPTY_FLAG_SUMMARY = {
     "vague_location":      0,
     "budget_splitting":    0,
     "mandate_mismatch":    0,
+    "mandate_mismatch_high": 0,
+    "mandate_mismatch_medium": 0,
     "overhead_dominance":  0,
     "composite_duplicate": 0,
     "inflated_projection": 0,
@@ -98,11 +100,19 @@ def build_flag_summary(results: List[Dict]) -> Dict[str, int]:
         seen_types = set()
         for f in r.get("flags", []):
             ft = f.get("flag_type", "")
-            if ft not in seen_types:
-                seen_types.add(ft)
-                key = _FLAG_MAP.get(ft)
-                if key:
-                    flag_summary[key] += 1
+            if ft in seen_types:
+                continue
+            seen_types.add(ft)
+            key = _FLAG_MAP.get(ft)
+            if key:
+                flag_summary[key] += 1
+            if ft == "MANDATE_MISMATCH":
+                sev = (f.get("severity") or "").upper()
+                kind = ((f.get("evidence") or {}).get("mismatch_kind") or "").lower()
+                if sev == "HIGH" or kind == "excluded":
+                    flag_summary["mandate_mismatch_high"] += 1
+                else:
+                    flag_summary["mandate_mismatch_medium"] += 1
     return flag_summary
 
 
@@ -115,6 +125,8 @@ def summarize_scan(df: pd.DataFrame, results: List[Dict]) -> Dict[str, Any]:
     at_risk_amount = sum(safe_float(r.get("amount") or 0) for r in results)
     stats = get_last_run_stats()
     shortlist = [r for r in results if r.get("on_shortlist")]
+    from engines.classifier import get_flag_config
+    catch_all = (get_flag_config().get("catch_all_mda_patterns") or [])
     return {
         "total_items": total_items,
         "flagged_items": len(results),
@@ -128,6 +140,7 @@ def summarize_scan(df: pd.DataFrame, results: List[Dict]) -> Dict[str, Any]:
         "shortlist": shortlist,
         "unclassified_count": stats.get("unclassified_count", 0),
         "flag_rate": (len(results) / total_items) if total_items else 0.0,
+        "catch_all_mda_patterns": catch_all,
     }
 
 
@@ -156,7 +169,8 @@ async def root():
 
 @app.get("/favicon.ico")
 async def favicon():
-    return Response(status_code=204)
+    from fastapi.responses import FileResponse
+    return FileResponse("frontend/assets/favicon.ico", media_type="image/x-icon")
 
 
 @app.get("/health")

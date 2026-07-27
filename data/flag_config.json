@@ -7,6 +7,30 @@
   "inflated": {
     "multiplier": 3.0,
     "high_multiplier": 5.0,
+    "aggregate_exempt_signals": [
+      "nationwide",
+      "nation wide",
+      "nation-wide",
+      "across the nation",
+      "across the country",
+      "across all",
+      "across the 6",
+      "across the six",
+      "geo-political zone",
+      "geopolitical zone",
+      "geopolitical zones",
+      "geo political zones",
+      "programmes across",
+      "programs across",
+      "programme across",
+      "program across",
+      "multiple lots",
+      "selected locations across",
+      "across nigerian army",
+      "across all nigerian",
+      "major highways across",
+      "light up our highways"
+    ],
     "benchmarks_ngn": {
       "roads": 5000000000,
       "road_maintenance": 2000000000,
@@ -209,6 +233,16 @@
     "under_amount_ngn": 1000000000,
     "multiplier": 3.0
   },
+  "catch_all_mda_patterns": [
+    "SERVICE WIDE VOTE",
+    "SERVICE-WIDE VOTE",
+    "SERVICEWIDE VOTE",
+    "CONTINGENCY",
+    "PENSION",
+    "PUBLIC DEBT",
+    "DEBT SERVICE",
+    "CAPITAL SUPPLEMENTATION"
+  ],
   "scoring": {
     "top_n": 50,
     "overlap_groups": {

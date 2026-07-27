@@ -1,173 +1,197 @@
 {
-  "total_items": 17873,
-  "mda_populated_pct": 100.0,
-  "flagged_items": 3244,
-  "flag_rate_pct": 18.15,
-  "unclassified_count": 11366,
+  "unclassified_before_pct": 63.6,
+  "unclassified_after_pct": 23.72,
+  "unclassified_after": 4239,
+  "total_rows": 17873,
+  "newly_classified_samples": [
+    {
+      "description": "SERVICING AND REPLACEMENT OF FIRE EQUIPMENT, SMOKE DETECTORS EXTINGUISHERS AND FIRE ALARM SYSTEM AND TECHNICAL",
+      "category": "fire_service",
+      "keyword": "fire equipment"
+    },
+    {
+      "description": "PROCUREMENT OF INFECTION PREVENTION/CONTROL SUPPLIES FOR IPC PROGRAMMES/ORPHAN ANND VULNERABLE CHILDREN",
+      "category": "disease_control",
+      "keyword": "infection prevention"
+    },
+    {
+      "description": "CONSTRUCTION OF OHEKWE/OBI WALI ROAD, MGBUOGBA TOWN, RIVERS STATE (ARMY ENGINEERING)",
+      "category": "roads",
+      "keyword": " road"
+    },
+    {
+      "description": "RENOVATION OF RESIDENTIAL ACCOMMODATION AND OTHER BARRACKS FACILITIES ACROSS THE COUNTRY BY DIRECT LABOUR",
+      "category": "housing",
+      "keyword": "accommodation"
+    },
+    {
+      "description": "EQUIPPING OF ICT HUB BY DIRECT LABOUR Budget Office of the Federation              Page 84 / 2790             ",
+      "category": "ict_infrastructure",
+      "keyword": "ict hub"
+    },
+    {
+      "description": "PROCUREMENT AND INSTALLATION OF SOLAR LIGHTS IN NEW CADETS' TRAINING SITES AND BUILDINGS",
+      "category": "renewable_energy",
+      "keyword": "solar lights"
+    },
+    {
+      "description": "SUPPLY OF EMPOWERMENT ITEMS TO SELECTED AREAS IN JEMA'A AND SANGA LGA OF KADUNA STATE Budget Office of the Fed",
+      "category": "social_welfare",
+      "keyword": "empowerment"
+    },
+    {
+      "description": "RENOVATION OF CLASSROOMS AND SUPPLY OF CHAIRS AND TABLES TO SELECTED SECONDARY SCHOOLS ACROSS DELTA CENTRAL SE",
+      "category": "secondary_schools",
+      "keyword": "secondary school"
+    },
+    {
+      "description": "PROVISION OF GRAINS TO RESIDENTS OF MABUHU IN KADUNA STATE",
+      "category": "food_storage",
+      "keyword": "grains"
+    },
+    {
+      "description": "SURFACE DRESSING OF KAGARKO- AKOTI ROAD KAGARKO L.G.A IN KACHIA/KAGARKO, FEDRAL CONSTITUENCY, KADUNA STATE",
+      "category": "roads",
+      "keyword": "surface dressing"
+    }
+  ],
+  "inflation_before_aggregate_exempt": 165,
+  "inflation_after_aggregate_exempt": 124,
+  "inflation_removed": 41,
+  "mandate_high_excluded": 123,
+  "mandate_medium_not_in_scope": 1326,
+  "mandate_total": 1449,
   "per_flag": {
-    "INFLATED_AMOUNT": 67,
+    "INFLATED_AMOUNT": 124,
+    "MISSING_LOCATION": 793,
+    "MANDATE_MISMATCH": 1449,
     "VAGUE_LOCATION": 825,
-    "MISSING_LOCATION": 1011,
     "DUPLICATE_CLUSTER": 528,
     "BUDGET_SPLITTING": 548,
-    "MANDATE_MISMATCH": 799,
     "CONTEXT_MISMATCH": 362,
-    "GHOST_PROJECT": 30
+    "GHOST_PROJECT": 21
   },
-  "high_risk_before_benchmark_recalibration": 639,
-  "high_risk_after_benchmark_recalibration": 615,
-  "inflated_before": 208,
-  "inflated_after": 67,
+  "flagged": 3733,
+  "flag_rate_pct": 20.89,
   "top10": [
     {
       "rank": 1,
-      "score": 98,
-      "level": "HIGH",
-      "mda": "NIGERIAN ARMY",
-      "amount": 44203698000.0,
+      "score": 100,
+      "mda": "FEDERAL MINISTRY OF EDUCATION - HQTRS",
+      "amount": 28000000000.0,
       "flags": [
-        "INFLATED_AMOUNT",
-        "VAGUE_LOCATION"
+        "INFLATED_AMOUNT:HIGH",
+        "MISSING_LOCATION:HIGH",
+        "MANDATE_MISMATCH:MEDIUM"
       ],
-      "signals": 2,
-      "raw_flags": 2,
-      "description": "CONSTRUCTION OF RESIDENTIAL ACCOMMODATION FOR OFFICERS AND SOLDIERS ACROSS NIGERIAN ARMY BARRACKS"
+      "description": "REHABILITATION OF CLASSROOMS AND HOSTELS IN FUCS"
     },
     {
       "rank": 2,
-      "score": 98,
-      "level": "HIGH",
-      "mda": "FEDERAL MINISTRY OF POWER -HQTRS",
-      "amount": 17318000000.0,
+      "score": 100,
+      "mda": "FEDERAL MINISTRY OF EDUCATION - HQTRS",
+      "amount": 14000000000.0,
       "flags": [
-        "INFLATED_AMOUNT",
-        "MISSING_LOCATION"
+        "INFLATED_AMOUNT:HIGH",
+        "MISSING_LOCATION:HIGH",
+        "MANDATE_MISMATCH:MEDIUM"
       ],
-      "signals": 2,
-      "raw_flags": 2,
-      "description": "PROVISION OF SOLAR STREET LIGHTS FOR MAJOR HIGHWAYS ACROSS THE 6 GEO- POLITICAL ZONES UNDER RENEWED HOPE LIGHT UP OUR HIGHWAYS PROJECT DOMIC"
+      "description": "PROVISION OF SECURITY INFRASTRUCTURE IN 118 UNITY COLLEGES SOLAR ELECTRICTY"
     },
     {
       "rank": 3,
-      "score": 98,
-      "level": "HIGH",
-      "mda": "FEDERAL MINISTRY OF YOUTH DEVELOPMENT - HQTRS",
+      "score": 100,
+      "mda": "FEDERAL MINISTRY OF EDUCATION - HQTRS",
       "amount": 14000000000.0,
       "flags": [
-        "INFLATED_AMOUNT",
-        "VAGUE_LOCATION"
+        "INFLATED_AMOUNT:HIGH",
+        "MISSING_LOCATION:HIGH",
+        "MANDATE_MISMATCH:MEDIUM"
       ],
-      "signals": 2,
-      "raw_flags": 2,
-      "description": "YOUTH EMPOWERMENT PROGRAMMES ACROSS THE NATION WIDE FOR PAYMENTS Budget Office of the Federation               Page 2781 / 2790             "
+      "description": "PROVISION OF SECURITY INFRASTRUCTURE IN 118 UNITY COLLEGES : PERIMETER FENCING,"
     },
     {
       "rank": 4,
-      "score": 97,
-      "level": "HIGH",
+      "score": 98,
       "mda": "FEDERAL MINISTRY OF WORKS",
-      "amount": 6300000000.0,
+      "amount": 13300000000.0,
       "flags": [
-        "MISSING_LOCATION",
-        "VAGUE_LOCATION",
-        "DUPLICATE_CLUSTER"
+        "INFLATED_AMOUNT:HIGH",
+        "MISSING_LOCATION:HIGH"
       ],
-      "signals": 2,
-      "raw_flags": 3,
-      "description": "CONSTRUCTION OF ILARA - ISELU SECTION I ROAD PHASE III"
+      "description": "CONSTRUCTION/REHABILITATION OF AMASIRU - OKPOSI - UBURU - ISHIAGU ROAD"
     },
     {
       "rank": 5,
-      "score": 97,
-      "level": "HIGH",
+      "score": 98,
       "mda": "FEDERAL MINISTRY OF WORKS",
-      "amount": 6300000000.0,
+      "amount": 10500000000.0,
       "flags": [
-        "MISSING_LOCATION",
-        "VAGUE_LOCATION",
-        "DUPLICATE_CLUSTER"
+        "INFLATED_AMOUNT:HIGH",
+        "MISSING_LOCATION:HIGH",
+        "VAGUE_LOCATION:LOW"
       ],
-      "signals": 2,
-      "raw_flags": 3,
-      "description": "CONSTRUCTION OF ILARA - ISELU SECTION I ROAD PHASE II"
+      "description": "BENIN - AKURE DUALIZATION OF BENIN AKURE \u00c3\u00c2ILESHA ROAD, SECTION I (PHASE I: REHABILITATION OF EXISTING BENIN AKURE ROAD "
     },
     {
       "rank": 6,
-      "score": 96,
-      "level": "HIGH",
-      "mda": "NIGERIA CORRECTIONAL SERVICE",
-      "amount": 5063596810.0,
+      "score": 97,
+      "mda": "FEDERAL MINISTRY OF WORKS",
+      "amount": 6300000000.0,
       "flags": [
-        "INFLATED_AMOUNT",
-        "VAGUE_LOCATION"
+        "MISSING_LOCATION:HIGH",
+        "VAGUE_LOCATION:LOW",
+        "DUPLICATE_CLUSTER:HIGH"
       ],
-      "signals": 2,
-      "raw_flags": 2,
-      "description": "CONSTRUCTION/REHABILITATION OF CUSTODIAL CENTRES AND BARRACKS NATIONWIDE"
+      "description": "CONSTRUCTION OF ILARA - ISELU SECTION I ROAD PHASE III"
     },
     {
       "rank": 7,
-      "score": 95,
-      "level": "HIGH",
-      "mda": "NIGERIAN BUILDING AND ROAD RESEARCH INSTITUTE - LAGOS",
-      "amount": 3500000000.0,
+      "score": 97,
+      "mda": "FEDERAL MINISTRY OF WORKS",
+      "amount": 6300000000.0,
       "flags": [
-        "MISSING_LOCATION",
-        "VAGUE_LOCATION",
-        "DUPLICATE_CLUSTER",
-        "BUDGET_SPLITTING"
+        "MISSING_LOCATION:HIGH",
+        "VAGUE_LOCATION:LOW",
+        "DUPLICATE_CLUSTER:HIGH"
       ],
-      "signals": 2,
-      "raw_flags": 4,
-      "description": "CONSTRUCTION/REHABILITATION OF RURAL AND TOWNSHIP ROADS IN SELECTED LOCATIONS IN THE SOUTHEAST REGION (MULTIPLE LOTS)"
+      "description": "CONSTRUCTION OF ILARA - ISELU SECTION I ROAD PHASE II"
     },
     {
       "rank": 8,
       "score": 95,
-      "level": "HIGH",
-      "mda": "NIGERIAN BUILDING AND ROAD RESEARCH INSTITUTE - LAGOS",
-      "amount": 3500000000.0,
+      "mda": "NATIONAL CEREALS RESEARCH INSTITUTE- BADEGGI",
+      "amount": 4130000000.0,
       "flags": [
-        "MISSING_LOCATION",
-        "VAGUE_LOCATION",
-        "DUPLICATE_CLUSTER",
-        "BUDGET_SPLITTING"
+        "INFLATED_AMOUNT:HIGH",
+        "MISSING_LOCATION:HIGH",
+        "VAGUE_LOCATION:HIGH"
       ],
-      "signals": 2,
-      "raw_flags": 4,
-      "description": "CONSTRUCTION/REHABILITATION OF RURAL AND TOWNSHIP ROADS IN SELECTED LOCATIONS IN THE SOUTH-WEST REGION (MULTIPLE LOTS)"
+      "description": "PROVISION/SUPPLY OF GRAINS TO RURAL FARMERS IN SELECTED COMMUNITIES OF SOUTH SOUTH STATES(LOT 1-10)"
     },
     {
       "rank": 9,
       "score": 95,
-      "level": "HIGH",
-      "mda": "NIGERIAN BUILDING AND ROAD RESEARCH INSTITUTE - LAGOS",
+      "mda": "UNIVERSITY COLLEGE HOSPITAL IBADAN",
       "amount": 3500000000.0,
       "flags": [
-        "MISSING_LOCATION",
-        "VAGUE_LOCATION",
-        "DUPLICATE_CLUSTER",
-        "BUDGET_SPLITTING"
+        "INFLATED_AMOUNT:HIGH",
+        "VAGUE_LOCATION:HIGH"
       ],
-      "signals": 2,
-      "raw_flags": 4,
-      "description": "CONSTRUCTION/REHABILITATION OF RURAL AND TOWNSHIP ROADS IN SELECTED LOCATIONS IN THE SOUTH-SOUTH REGION (MULTIPLE LOTS)"
+      "description": "PROCUREMENT OF HOSPITAL AMBULANCE FOR EMPOWERMENT FOR MATERNITY / HEALTH CENTRES IN VARIOUS AREAS OF SOUTH EAST AND SOUT"
     },
     {
       "rank": 10,
       "score": 95,
-      "level": "HIGH",
       "mda": "NIGERIAN BUILDING AND ROAD RESEARCH INSTITUTE - LAGOS",
       "amount": 3500000000.0,
       "flags": [
-        "MISSING_LOCATION",
-        "VAGUE_LOCATION",
-        "DUPLICATE_CLUSTER",
-        "BUDGET_SPLITTING"
+        "MISSING_LOCATION:HIGH",
+        "VAGUE_LOCATION:HIGH",
+        "DUPLICATE_CLUSTER:HIGH",
+        "BUDGET_SPLITTING:HIGH"
       ],
-      "signals": 2,
-      "raw_flags": 4,
-      "description": "CONSTRUCTION/REHABILITATION OF RURAL AND TOWNSHIP ROADS IN SELECTED LOCATIONS IN THE NORTHEAST REGION (MULTIPLE LOTS)"
+      "description": "CONSTRUCTION/REHABILITATION OF RURAL AND TOWNSHIP ROADS IN SELECTED LOCATIONS IN THE SOUTHEAST REGION (MULTIPLE LOTS)"
     }
   ]
 }

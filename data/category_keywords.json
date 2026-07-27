@@ -1,75 +1,762 @@
 {
   "_meta": {
     "purpose": "Deterministic keyword to category map for Flagly. Keys are categories from mda_mandates.json _meta.category_vocabulary.",
-    "version": "1.0",
-    "tie_break": "Most specific wins: the matching keyword with the greatest character length is chosen. If two matches have equal length, the earlier category in mda_mandates._meta.category_vocabulary wins. Matching is case insensitive substring search on the project description.",
+    "version": "1.3",
+    "tie_break": "1) Phrase overrides (forced category or hard block) apply first. 2) Domain categories beat catch-all recurrent_admin (so 'installation of solar lights' → renewable_energy, not admin). 3) Among remaining hits, longest matching keyword wins (most specific). 4) If equal length, earlier category in mda_mandates._meta.category_vocabulary wins. Matching is case-insensitive substring search (short tokens use word boundaries).",
+    "disambiguation": "category_exclusions: if any exclusion phrase for a category appears in the description, keyword hits for that category are ignored. Example: labour_programs is blocked when 'direct labour' or 'labour room' is present so construction-method / maternity uses do not misclassify.",
     "unknown_path": "If no keyword matches, the item is unclassified. Inflated Amount and Mandate Mismatch are skipped for unclassified items. The unclassified count is reported after each run."
   },
+  "phrase_overrides": [
+    {
+      "phrase": "labour room",
+      "category": "health_facilities"
+    },
+    {
+      "phrase": "labor room",
+      "category": "health_facilities"
+    },
+    {
+      "phrase": "maternity labour",
+      "category": "health_facilities"
+    },
+    {
+      "phrase": "maternity labor",
+      "category": "health_facilities"
+    },
+    {
+      "phrase": "direct labour",
+      "category": null
+    },
+    {
+      "phrase": "direct labor",
+      "category": null
+    },
+    {
+      "phrase": "through direct labour",
+      "category": null
+    },
+    {
+      "phrase": "through direct labor",
+      "category": null
+    },
+    {
+      "phrase": "by direct labour",
+      "category": null
+    },
+    {
+      "phrase": "by direct labor",
+      "category": null
+    }
+  ],
+  "category_exclusions": {
+    "labour_programs": [
+      "direct labour",
+      "direct labor",
+      "labour room",
+      "labor room",
+      "maternity labour",
+      "maternity labor",
+      "through direct labour",
+      "through direct labor",
+      "by labour",
+      "by labor",
+      "labour based",
+      "labor based",
+      "labour-based",
+      "labor-based"
+    ],
+    "oil_gas": [
+      "pipeline of",
+      "oil palm",
+      "vegetable oil"
+    ],
+    "customs": [
+      "custom built",
+      "custom-made",
+      "customer"
+    ],
+    "elections": [
+      "selection",
+      "election of contractors"
+    ],
+    "gender_programs": [
+      "engender",
+      "gender balance sheet"
+    ],
+    "rail": [
+      "trailer",
+      "railing",
+      "railings"
+    ],
+    "ports": [
+      "portfolio",
+      "portakabin",
+      "portable"
+    ],
+    "forestry": [
+      "forester hospital"
+    ]
+  },
   "categories": {
-    "roads": ["dual carriageway", "carriageway", "expressway", "highway", "feeder road", "access road", "road construction", "road dualisation", "road dualization", "asphalt overlay", "pavement of road"],
-    "road_maintenance": ["road maintenance", "maintenance of road", "rehabilitation of road", "resurfacing", "pothole", "routine maintenance of road"],
-    "bridges": ["bridge construction", "bridge rehabilitation", "flyover", "overpass", "underpass", "bridge"],
-    "rail": ["railway", "rail line", "rail track", "locomotive", "rolling stock"],
-    "airports": ["airport", "airstrip", "runway", "terminal building", "aviation"],
-    "ports": ["seaport", "harbour", "harbor", "jetty", "port development"],
-    "water_transport": ["ferry", "waterway", "inland water"],
-    "housing": ["housing estate", "residential housing", "staff quarters", "housing scheme", "mass housing", "accommodation", "guest house", "guest houses", "security quarters"],
-    "urban_infrastructure": ["street light", "streetlight", "street lighting", "drainage", "urban renewal", "walkway", "culvert"],
-    "health_facilities": ["general hospital", "teaching hospital", "primary health", "health centre", "health center", "clinic construction", "hospital construction", "hospital renovation"],
-    "medical_equipment": ["medical equipment", "hospital equipment", "diagnostic equipment", "mri", "ct scan", "ambulance"],
-    "pharmaceuticals": ["pharmaceutical", "drugs and vaccines", "essential medicines", "vaccine"],
-    "disease_control": ["disease control", "malaria", "tuberculosis", "hiv", "immunisation", "immunization"],
-    "primary_schools": ["primary school", "basic education", "classroom block", "ubec"],
-    "secondary_schools": ["secondary school", "unity school", "federal government college", "junior secondary", "senior secondary"],
-    "tertiary_education": ["university", "polytechnic", "college of education", "nursing school", "tertiary"],
-    "vocational_training": ["vocational training", "skills acquisition", "technical college"],
-    "educational_materials": ["textbooks", "learning materials", "instructional materials", "school furniture"],
-    "agriculture_inputs": ["fertilizer", "seedling", "farm input", "tractor", "agro input"],
-    "irrigation": ["irrigation", "irrigation scheme"],
-    "livestock": ["livestock", "cattle", "poultry", "veterinary"],
-    "fisheries": ["fisheries", "aquaculture", "fish farm"],
-    "food_storage": ["silo", "food storage", "grain reserve"],
-    "water_supply": ["borehole", "water supply", "water scheme", "water works", "pipe borne water"],
-    "sanitation": ["sanitation", "toilet", "latrine", "sewage"],
-    "dams": ["dam construction", "dam rehabilitation", "reservoir"],
-    "electricity_generation": ["power plant", "power generation", "electricity generation", "generating set", "gas turbine"],
-    "electricity_distribution": ["electricity distribution", "power distribution", "transmission line", "injection substation", "grid extension"],
-    "renewable_energy": ["solar street light", "solar streetlight", "solar power", "solar panel", "renewable energy", "wind power"],
-    "oil_gas": ["oil and gas", "pipeline", "refinery", "petroleum"],
-    "solid_minerals": ["solid mineral", "mining", "mineral exploration"],
-    "ict_infrastructure": ["ict infrastructure", "fibre optic", "fiber optic", "data centre", "data center", "broadband", "network infrastructure"],
-    "broadcasting": ["broadcasting", "transmitter", "radio station", "television station"],
-    "postal_services": ["postal service", "post office", "mail delivery"],
-    "financial_regulation": ["financial regulation", "banking supervision", "capital market"],
-    "taxation": ["tax administration", "revenue collection", "tax office"],
-    "customs": ["customs", "border post", "tariff"],
-    "military_equipment": ["procurement of arms", "arms and ammunition", "ammunition", "fighting vehicle", "armoured", "armored", "weapon system", "ordnance", "missile", "artillery", "military equipment", "defence equipment", "defense equipment"],
-    "policing": ["police station", "police formation", "policing", "nigeria police"],
-    "immigration": ["immigration", "passport office", "border control"],
-    "corrections": ["correctional", "prison", "custodial"],
-    "fire_service": ["fire service", "fire station", "fire fighting"],
-    "disaster_response": ["disaster", "emergency response", "neoma", "flood relief"],
-    "refugee_support": ["refugee", "internally displaced", "idp camp"],
-    "social_welfare": ["social welfare", "social protection", "cash transfer"],
-    "youth_programs": ["youth empowerment", "youth development", "npower"],
-    "sports_facilities": ["stadium", "sports complex", "sports centre", "sports center", "sporting facility"],
-    "cultural_facilities": ["cultural centre", "cultural center", "museum", "heritage site"],
-    "tourism_facilities": ["tourism", "tourist", "hospitality facility"],
-    "markets": ["modern market", "market stall", "market construction", "market rehabilitation"],
-    "industrial_parks": ["industrial park", "industrial estate", "special economic zone"],
-    "trade_facilitation": ["trade facilitation", "export promotion", "trade fair"],
-    "environmental_protection": ["environmental protection", "pollution control", "waste management"],
-    "climate_action": ["climate change", "climate action", "carbon"],
-    "forestry": ["forestry", "afforestation", "reforestation"],
-    "gender_programs": ["gender", "women empowerment", "girl child"],
-    "child_welfare": ["child welfare", "orphanage", "child protection"],
-    "labour_programs": ["labour", "labor", "employment generation", "job creation"],
-    "diplomacy": ["embassy", "high commission", "diplomatic", "foreign mission"],
-    "justice_administration": ["court complex", "judiciary", "justice administration", "law reform"],
-    "research_development": ["research and development", "r&d", "research institute"],
-    "population_data": ["census", "population data", "demographic"],
-    "elections": ["election", "electoral", "inec"],
-    "identity_management": ["national identity", "nimc", "identity card", "biometric"],
-    "recurrent_admin": ["personnel cost", "overhead cost", "sitting allowance", "travel and transport", "office stationery", "utility charges", "maintenance of office", "maintenance of building", "emolument", "salary", "wages", "horticultural", "cleaning services", "electrical fittings", "mechanical fittings"]
+    "roads": [
+      "dual carriageway",
+      "carriageway",
+      "expressway",
+      "highway",
+      "feeder road",
+      "access road",
+      "road construction",
+      "road dualisation",
+      "road dualization",
+      "asphalt overlay",
+      "pavement of road",
+      "construction of road",
+      "reconstruction of road",
+      "rehabilitation of road",
+      "of road",
+      "roads in",
+      "roads at",
+      "roads across",
+      "township road",
+      "rural road",
+      "internal road",
+      "road network",
+      "asphalt",
+      "road project",
+      "road rehabilitation",
+      "road reconstruction",
+      "spur road",
+      " road",
+      " roads",
+      "road,",
+      "road.",
+      "road/",
+      "roads,",
+      "roads.",
+      "community road",
+      "rural acess road",
+      "rural access road",
+      "surface dressing",
+      "roads ",
+      "roads\t"
+    ],
+    "road_maintenance": [
+      "road maintenance",
+      "maintenance of road",
+      "resurfacing",
+      "pothole",
+      "routine maintenance of road",
+      "road marking",
+      "road furniture",
+      "surface dressing"
+    ],
+    "bridges": [
+      "bridge construction",
+      "bridge rehabilitation",
+      "flyover",
+      "overpass",
+      "underpass",
+      "bridge"
+    ],
+    "rail": [
+      "railway",
+      "rail line",
+      "rail track",
+      "locomotive",
+      "rolling stock",
+      "rail corridor"
+    ],
+    "airports": [
+      "airport",
+      "airstrip",
+      "runway",
+      "terminal building",
+      "aviation"
+    ],
+    "ports": [
+      "seaport",
+      "harbour",
+      "harbor",
+      "jetty",
+      "port development"
+    ],
+    "water_transport": [
+      "ferry",
+      "waterway",
+      "inland water"
+    ],
+    "housing": [
+      "housing estate",
+      "residential housing",
+      "staff quarters",
+      "housing scheme",
+      "mass housing",
+      "accommodation",
+      "guest house",
+      "guest houses",
+      "security quarters",
+      "barracks",
+      "officers mess",
+      "residential building",
+      "staff housing",
+      "living quarters",
+      "furnishing of accommodation",
+      "furnishing of barracks",
+      "furnishing of quarters",
+      "building construction",
+      "construction of building",
+      "renovation of building"
+    ],
+    "urban_infrastructure": [
+      "street light",
+      "streetlight",
+      "street lighting",
+      "drainage",
+      "urban renewal",
+      "walkway",
+      "culvert",
+      "erosion control",
+      "erosion site",
+      "flood control",
+      "perimeter fence",
+      "perimeter fencing",
+      "fencing",
+      "landscaping",
+      "car park",
+      "parking lot",
+      "township infrastructure",
+      "security infrastructure",
+      "perimeter",
+      "construction/equipping",
+      "construction and equipping",
+      "construction/rehabilitation",
+      "rehabilitation of"
+    ],
+    "health_facilities": [
+      "general hospital",
+      "teaching hospital",
+      "primary health",
+      "health centre",
+      "health center",
+      "clinic construction",
+      "hospital construction",
+      "hospital renovation",
+      "phc",
+      "cottage hospital",
+      "medical centre",
+      "medical center",
+      "health facility",
+      "ward block",
+      "maternity",
+      " health",
+      "health ",
+      "health,",
+      "primary healthcare"
+    ],
+    "medical_equipment": [
+      "medical equipment",
+      "hospital equipment",
+      "diagnostic equipment",
+      "mri",
+      "ct scan",
+      "ambulance",
+      "medical outreach",
+      "medical supplies",
+      "laboratory equipment",
+      "lab equipment",
+      "equipping of laboratory",
+      "equipping of hospital",
+      "equipping of clinic",
+      "multi-user laboratory"
+    ],
+    "water_supply": [
+      "borehole",
+      "water supply",
+      "water scheme",
+      "water works",
+      "pipe borne water",
+      "motorised borehole",
+      "motorized borehole",
+      "hand pump",
+      "water treatment",
+      " water",
+      "water,",
+      "water.",
+      "water/"
+    ],
+    "research_development": [
+      "research and development",
+      "r&d",
+      "research institute",
+      "research project",
+      "strategic plan",
+      "research",
+      "science and technology",
+      "laboratory",
+      "technology and innovation",
+      "innovation"
+    ],
+    "cultural_facilities": [
+      "cultural centre",
+      "cultural center",
+      "museum",
+      "heritage site",
+      "town hall",
+      "civic centre",
+      "civic center"
+    ],
+    "agriculture_inputs": [
+      "fertilizer",
+      "seedling",
+      "farm input",
+      "tractor",
+      "agro input",
+      "farm implements",
+      "agricultural input",
+      "agricultural",
+      "farmers"
+    ],
+    "recurrent_admin": [
+      "personnel cost",
+      "overhead cost",
+      "sitting allowance",
+      "travel and transport",
+      "office stationery",
+      "utility charges",
+      "maintenance of office",
+      "maintenance of building",
+      "emolument",
+      "salary",
+      "wages",
+      "horticultural",
+      "cleaning services",
+      "electrical fittings",
+      "mechanical fittings",
+      "office furniture",
+      "office equipment",
+      "motor vehicle",
+      "motor vehicles",
+      "utility vehicle",
+      "project monitoring",
+      "monitoring and evaluation",
+      "m&e",
+      "stock verification",
+      "capacity building workshop",
+      "renovation of office",
+      "purchase of furniture",
+      "purchase of computer",
+      "purchase of office",
+      "administrative",
+      "secretariat",
+      "head office",
+      "headquarters building",
+      "zonal office",
+      "zonal offices",
+      "furnishing",
+      "furnishing of",
+      "office furnishing",
+      "purchase of",
+      "procurement of",
+      "supply of",
+      "installation of",
+      "outstanding liabilities",
+      "payment of outstanding",
+      "outstanding payment",
+      "liabilities"
+    ],
+    "pharmaceuticals": [
+      "pharmaceutical",
+      "drugs and vaccines",
+      "essential medicines",
+      "vaccine",
+      "essential drugs"
+    ],
+    "disease_control": [
+      "disease control",
+      "malaria",
+      "tuberculosis",
+      "hiv",
+      "immunisation",
+      "immunization",
+      "epidemic",
+      "public health campaign",
+      "infection prevention",
+      "infection control",
+      "ipc "
+    ],
+    "primary_schools": [
+      "primary school",
+      "basic education",
+      "classroom block",
+      "ubec",
+      "classrooms",
+      "nomadic school",
+      "selected schools",
+      "school block",
+      "classroom"
+    ],
+    "secondary_schools": [
+      "secondary school",
+      "unity school",
+      "federal government college",
+      "junior secondary",
+      "senior secondary",
+      "unity college",
+      "unity colleges",
+      "fucs"
+    ],
+    "tertiary_education": [
+      "university",
+      "polytechnic",
+      "college of education",
+      "nursing school",
+      "tertiary",
+      "undergraduate",
+      "graduate degree",
+      "scholarship",
+      "hostel"
+    ],
+    "vocational_training": [
+      "vocational training",
+      "skills acquisition",
+      "technical college",
+      "capacity building",
+      "training and empowerment",
+      "skills training",
+      "entrepreneurship training",
+      "training of",
+      "training for",
+      "skill acquisition"
+    ],
+    "educational_materials": [
+      "textbooks",
+      "learning materials",
+      "instructional materials",
+      "school furniture",
+      "teaching aids"
+    ],
+    "irrigation": [
+      "irrigation",
+      "irrigation scheme"
+    ],
+    "livestock": [
+      "livestock",
+      "cattle",
+      "poultry",
+      "veterinary"
+    ],
+    "fisheries": [
+      "fisheries",
+      "aquaculture",
+      "fish farm"
+    ],
+    "food_storage": [
+      "silo",
+      "food storage",
+      "grain reserve",
+      "food items",
+      "palliative food",
+      "supply of grains",
+      "grains"
+    ],
+    "sanitation": [
+      "sanitation",
+      "toilet",
+      "latrine",
+      "sewage",
+      "wash facility"
+    ],
+    "dams": [
+      "dam construction",
+      "dam rehabilitation",
+      "reservoir"
+    ],
+    "electricity_generation": [
+      "power plant",
+      "power generation",
+      "electricity generation",
+      "generating set",
+      "gas turbine",
+      "generator"
+    ],
+    "electricity_distribution": [
+      "electricity distribution",
+      "power distribution",
+      "transmission line",
+      "injection substation",
+      "grid extension",
+      "transformer",
+      "rural electrification"
+    ],
+    "renewable_energy": [
+      "solar street light",
+      "solar streetlight",
+      "solar power",
+      "solar panel",
+      "renewable energy",
+      "wind power",
+      "solar mini grid",
+      "solar borehole",
+      "solar light",
+      "solar lights",
+      "solar inverter",
+      "solar system",
+      "solar systems",
+      "solar energy",
+      "solar security light",
+      "solar electricity",
+      "mini grid",
+      "minigrid",
+      " solar",
+      "solar "
+    ],
+    "oil_gas": [
+      "oil and gas",
+      "pipeline",
+      "refinery",
+      "petroleum",
+      "gas processing"
+    ],
+    "solid_minerals": [
+      "solid mineral",
+      "mining",
+      "mineral exploration"
+    ],
+    "ict_infrastructure": [
+      "ict infrastructure",
+      "fibre optic",
+      "fiber optic",
+      "data centre",
+      "data center",
+      "broadband",
+      "network infrastructure",
+      "computer software",
+      "computer hardware",
+      "digitization",
+      "digitalization",
+      "ict equipment",
+      "laptops",
+      "desktop computers",
+      "e-library",
+      "management system",
+      "ict hub",
+      "digitalisation",
+      "digitisation",
+      "computerisation",
+      "computerization"
+    ],
+    "broadcasting": [
+      "broadcasting",
+      "transmitter",
+      "radio station",
+      "television station"
+    ],
+    "postal_services": [
+      "postal service",
+      "post office",
+      "mail delivery"
+    ],
+    "financial_regulation": [
+      "financial regulation",
+      "banking supervision",
+      "capital market",
+      "ipsas"
+    ],
+    "taxation": [
+      "tax administration",
+      "revenue collection",
+      "tax office"
+    ],
+    "customs": [
+      "customs",
+      "border post",
+      "tariff"
+    ],
+    "military_equipment": [
+      "procurement of arms",
+      "arms and ammunition",
+      "ammunition",
+      "fighting vehicle",
+      "armoured",
+      "armored",
+      "weapon system",
+      "ordnance",
+      "missile",
+      "artillery",
+      "military equipment",
+      "defence equipment",
+      "defense equipment",
+      "security equipment"
+    ],
+    "policing": [
+      "police station",
+      "police formation",
+      "policing",
+      "nigeria police"
+    ],
+    "immigration": [
+      "immigration",
+      "passport office",
+      "border control"
+    ],
+    "corrections": [
+      "correctional",
+      "prison",
+      "custodial"
+    ],
+    "fire_service": [
+      "fire service",
+      "fire station",
+      "fire fighting",
+      "fire equipment",
+      "fire extinguisher",
+      "smoke detector",
+      "fire alarm"
+    ],
+    "disaster_response": [
+      "disaster",
+      "emergency response",
+      "neoma",
+      "flood relief"
+    ],
+    "refugee_support": [
+      "refugee",
+      "internally displaced",
+      "idp camp"
+    ],
+    "social_welfare": [
+      "social welfare",
+      "social protection",
+      "cash transfer",
+      "palliative",
+      "empowerment programme",
+      "empowerment program",
+      "empowerment of",
+      "community empowerment",
+      "empowerment materials",
+      "empowerment",
+      "supply of motorcycles",
+      "motorcycles",
+      "traditional rulers",
+      "community development",
+      "development programme",
+      "development program"
+    ],
+    "youth_programs": [
+      "youth empowerment",
+      "youth development",
+      "npower",
+      "youths and women",
+      "youth and women",
+      "empowerment of youths",
+      "youth training",
+      "youths empowerment"
+    ],
+    "sports_facilities": [
+      "stadium",
+      "sports complex",
+      "sports centre",
+      "sports center",
+      "sporting facility",
+      "sports pavilion",
+      "sporting equipment"
+    ],
+    "tourism_facilities": [
+      "tourism",
+      "tourist",
+      "hospitality facility"
+    ],
+    "markets": [
+      "modern market",
+      "market stall",
+      "market construction",
+      "market rehabilitation",
+      "market lockup"
+    ],
+    "industrial_parks": [
+      "industrial park",
+      "industrial estate",
+      "special economic zone"
+    ],
+    "trade_facilitation": [
+      "trade facilitation",
+      "export promotion",
+      "trade fair"
+    ],
+    "environmental_protection": [
+      "environmental protection",
+      "pollution control",
+      "waste management",
+      "erosion control",
+      "environmental remediation"
+    ],
+    "climate_action": [
+      "climate change",
+      "climate action",
+      "carbon"
+    ],
+    "forestry": [
+      "forestry",
+      "afforestation",
+      "reforestation"
+    ],
+    "gender_programs": [
+      "women empowerment",
+      "girl child",
+      "gender based",
+      "gender-based",
+      "women and youths",
+      "empowerment of women",
+      "women and youth"
+    ],
+    "child_welfare": [
+      "child welfare",
+      "orphanage",
+      "child protection"
+    ],
+    "labour_programs": [
+      "employment generation",
+      "job creation",
+      "labour programme",
+      "labor program",
+      "labour program",
+      "ministry of labour",
+      "ministry of labor",
+      "industrial relations",
+      "employment scheme"
+    ],
+    "diplomacy": [
+      "embassy",
+      "high commission",
+      "diplomatic",
+      "foreign mission"
+    ],
+    "justice_administration": [
+      "court complex",
+      "judiciary",
+      "justice administration",
+      "law reform",
+      "dispute resolution",
+      "adr",
+      "anti-corruption",
+      "anti corruption",
+      "anticorruption"
+    ],
+    "population_data": [
+      "census",
+      "population data",
+      "demographic"
+    ],
+    "elections": [
+      "election",
+      "electoral",
+      "inec"
+    ],
+    "identity_management": [
+      "national identity",
+      "nimc",
+      "identity card",
+      "biometric"
+    ]
   }
 }

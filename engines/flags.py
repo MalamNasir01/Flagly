@@ -212,14 +212,56 @@ def _has_physical_project_keyword(description: str) -> bool:
 
 # ─── Flag 1: INFLATED_AMOUNT (relative to category benchmark) ─────────────────
 
+# Aggregate / nationwide programme signals — exempt from unit-price inflation.
+_DEFAULT_AGGREGATE_SIGNALS = [
+    'nationwide', 'nation wide', 'nation-wide', 'across the nation', 'across the country',
+    'across all', 'across the 6', 'across the six', 'geo-political zone', 'geopolitical zone',
+    'geopolitical zones', 'geo political zones', 'all geopolitical', 'programmes across',
+    'programs across', 'programme across', 'program across', 'multiple lots',
+    'selected locations across', 'across nigerian army', 'across all nigerian',
+]
+
+_AGGREGATE_RE = re.compile(
+    r'\b(nationwide|nation[\s\-]?wide|across\s+the\s+(?:nation|country)|'
+    r'across\s+all\b|across\s+the\s+(?:6|six)\b|'
+    r'(?:geo[\s\-]?political)\s+zones?|programmes?\s+across|programs?\s+across|'
+    r'multiple\s+lots|selected\s+locations\s+across)\b',
+    re.IGNORECASE,
+)
+
+
+def _aggregate_signal(description: str) -> Optional[str]:
+    """Return matched aggregate phrase if line is a programme/nationwide aggregate."""
+    if not description:
+        return None
+    text = description.lower()
+    from engines.classifier import get_flag_config
+    cfg = get_flag_config().get('inflated') or {}
+    if 'aggregate_exempt_signals' in cfg:
+        phrases = cfg.get('aggregate_exempt_signals') or []
+    else:
+        phrases = _DEFAULT_AGGREGATE_SIGNALS
+    for phrase in sorted((str(p).lower() for p in phrases), key=len, reverse=True):
+        if phrase and phrase in text:
+            return phrase
+    # Regex fallback only when using defaults (config key absent), not when explicitly emptied.
+    if 'aggregate_exempt_signals' not in cfg:
+        m = _AGGREGATE_RE.search(description)
+        return m.group(0).lower() if m else None
+    return None
+
+
 def flag_inflated_amount(row: Dict) -> Optional[Dict]:
     """Flag only when amount exceeds category benchmark * configured multiplier.
 
     Unknown category: skip (no benchmark = no flag). No flat ₦1B fallback.
     Uses large-facility tier when description matches tier keywords.
+    Aggregate / nationwide programme lines are exempt — vague/missing-location
+    already covers them; unit-price inflation does not apply.
     """
     from engines.classifier import (
         classify_with_match,
+        get_flag_config,
         get_inflated_benchmark_meta,
         get_inflated_multiplier,
         get_inflated_high_multiplier,
@@ -237,6 +279,12 @@ def flag_inflated_amount(row: Dict) -> Optional[Dict]:
     row['_project_category'] = category
     row['_category_keyword'] = matched_kw
     if not category:
+        return None
+
+    # Aggregate / programme-wide lines: exempt from unit-price inflation
+    agg_hit = _aggregate_signal(description)
+    if agg_hit:
+        row['_inflation_exempt'] = agg_hit
         return None
 
     meta = get_inflated_benchmark_meta(category, description)
@@ -529,6 +577,26 @@ YEAR_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Year ranges like 2023-2027 / 2023–2027 (en/em dash). If end >= budget year, start is not stale.
+YEAR_RANGE_RE = re.compile(
+    r'(?<!\d)((?:19|20)\d{2})\s*[-–—]\s*((?:19|20)\d{2})(?!\d)'
+)
+
+
+def _stale_years_in_description(description: str, budget_year: int) -> List[int]:
+    """Years that look stale vs budget_year, excluding start years of still-active ranges."""
+    protected = set()
+    for m in YEAR_RANGE_RE.finditer(description or ''):
+        start_y, end_y = int(m.group(1)), int(m.group(2))
+        if end_y < start_y:
+            start_y, end_y = end_y, start_y
+        if end_y >= budget_year:
+            # Plan/strategy still covers the budget year — do not treat range start as ghost.
+            protected.add(start_y)
+            protected.add(end_y)
+    years = [int(m) for m in YEAR_RE.findall(description or '')]
+    return [y for y in years if budget_year - y >= 2 and y not in protected]
+
 
 def flag_ghost_project(row: Dict, all_descriptions: List[str], budget_year: Optional[str]) -> Optional[Dict]:
     if not budget_year:
@@ -543,8 +611,7 @@ def flag_ghost_project(row: Dict, all_descriptions: List[str], budget_year: Opti
         return None
 
     description = _str_cell(row.get('description') or row.get('project_name'))
-    years_in_desc = [int(m) for m in YEAR_RE.findall(description)]
-    stale_years = [y for y in years_in_desc if by - y >= 2]
+    stale_years = _stale_years_in_description(description, by)
     if not stale_years:
         return None
 
@@ -552,8 +619,8 @@ def flag_ghost_project(row: Dict, all_descriptions: List[str], budget_year: Opti
         if other_desc == description:
             continue
         if fuzz.token_set_ratio(description, other_desc) >= 95:
-            other_years = [int(m) for m in YEAR_RE.findall(other_desc)]
-            if any(by - y >= 2 for y in other_years):
+            other_stale = _stale_years_in_description(other_desc, by)
+            if other_stale:
                 return {
                     'flag_type': 'GHOST_PROJECT',
                     'severity': 'MEDIUM',
@@ -861,15 +928,17 @@ def flag_mandate_mismatch(row: Dict) -> Optional[Dict]:
 
     if cat in excluded:
         severity = 'HIGH'
+        mismatch_kind = 'excluded'
         reason = f'listed in the MDA excluded categories ({cat})'
     else:
         severity = 'MEDIUM'
+        mismatch_kind = 'not_in_scope'
         reason = 'neither in the MDA scope nor its excluded list, pending review'
 
     return {
         'flag_type': 'MANDATE_MISMATCH',
         'severity': severity,
-        'title': 'Possible Mandate Violation',
+        'title': 'Possible Mandate Violation' if severity == 'HIGH' else 'Possible Mandate Drift',
         'explanation': (
             f'{ministry} is scoped to {", ".join(scope[:5]) or "its statutory functions"}, '
             f'but this project was classified as {cat}. That is {reason}. '
@@ -881,6 +950,7 @@ def flag_mandate_mismatch(row: Dict) -> Optional[Dict]:
             'excluded': excluded,
             'project_category': cat,
             'matched_keyword': matched_kw,
+            'mismatch_kind': mismatch_kind,
         },
     }
 

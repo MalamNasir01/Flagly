@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Flagly | Nigerian Budget Red Flag Scanner</title>
+<link rel="icon" href="/static/assets/favicon.ico?v=2" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/assets/favicon-32.png?v=2">
+<link rel="apple-touch-icon" href="/static/assets/apple-touch-icon.png?v=2">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -32,8 +35,9 @@ a{color:inherit;text-decoration:none}
 .nav-links a:hover{color:var(--navy-900)}
 .nav-cta{background:var(--red-500);color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;transition:background .15s;white-space:nowrap}
 .nav-cta:hover{background:var(--red-600)}
-.logo{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.logo svg{height:32px;width:auto}
+.logo{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none}
+.logo img{height:40px;width:auto;display:block}
+.logo-mark{height:32px;width:32px;display:none}
 
 /* Hero */
 .hero{padding:72px 0 56px;background:var(--bg-alt)}
@@ -323,13 +327,8 @@ tbody td{padding:11px 12px;font-size:12px;vertical-align:middle}
 
 <nav class="nav">
   <div class="nav-inner">
-    <a class="logo" href="#">
-      <svg viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="0" y="4" width="24" height="16" rx="2" fill="#E63946"/>
-        <rect x="0" y="4" width="8" height="16" fill="#0B2545"/>
-        <circle cx="12" cy="12" r="3" fill="#FFFFFF"/>
-        <text x="32" y="22" font-family="Inter,sans-serif" font-weight="800" font-size="18" fill="#0B2545">flagly</text>
-      </svg>
+    <a class="logo" href="#" aria-label="Flagly home">
+      <img src="/static/assets/flagly-logo.png" alt="Flagly — Find the flags. Fix the future.">
     </a>
     <div class="nav-links">
       <a href="#how">How it works</a>
@@ -1061,7 +1060,22 @@ function resultMdaName(r) {
   if (!raw || /^n\/?a$/i.test(raw) || /^unknown$/i.test(raw) || raw.toLowerCase() === 'nan') {
     return 'Unknown';
   }
-  return raw;
+  return labelCatchAllMda(raw);
+}
+
+function labelCatchAllMda(name) {
+  const patterns = (scanData && scanData.catch_all_mda_patterns) || [
+    'SERVICE WIDE VOTE', 'SERVICE-WIDE VOTE', 'SERVICEWIDE VOTE',
+    'CONTINGENCY', 'PENSION', 'PUBLIC DEBT', 'DEBT SERVICE', 'CAPITAL SUPPLEMENTATION'
+  ];
+  const upper = name.toUpperCase();
+  for (const p of patterns) {
+    if (upper.includes(String(p).toUpperCase())) {
+      if (/catch-all vote/i.test(name)) return name;
+      return name + ' (catch-all vote)';
+    }
+  }
+  return name;
 }
 
 function safeAmount(v) {
@@ -1243,9 +1257,22 @@ function renderCharts() {
   allResults.forEach(r => {
     (r.flags || []).forEach(f => {
       const ft = f.flag_type || 'OTHER';
-      flagCounts[ft] = (flagCounts[ft] || 0) + 1;
+      let key = ft;
+      if (ft === 'MANDATE_MISMATCH') {
+        const sev = (f.severity || '').toUpperCase();
+        const kind = ((f.evidence || {}).mismatch_kind || '').toLowerCase();
+        key = (sev === 'HIGH' || kind === 'excluded')
+          ? 'MANDATE_MISMATCH_HIGH'
+          : 'MANDATE_MISMATCH_MEDIUM';
+      }
+      flagCounts[key] = (flagCounts[key] || 0) + 1;
     });
   });
+  const flagLabel = (ft) => {
+    if (ft === 'MANDATE_MISMATCH_HIGH') return 'Mandate (HIGH excluded)';
+    if (ft === 'MANDATE_MISMATCH_MEDIUM') return 'Mandate (MEDIUM not-in-scope)';
+    return FLAG_TYPE_LABELS[ft] || ft.replace(/_/g, ' ');
+  };
   const flagRows = Object.entries(flagCounts).sort((a, b) => b[1] - a[1]);
   if (!flagRows.length) {
     setChartEmpty('chartFlagsWrap', 'No items');
@@ -1254,11 +1281,15 @@ function renderCharts() {
     chartInstances.flags = new Chart(canvas, {
       type: 'bar',
       data: {
-        labels: flagRows.map(([ft]) => FLAG_TYPE_LABELS[ft] || ft.replace(/_/g, ' ')),
+        labels: flagRows.map(([ft]) => flagLabel(ft)),
         datasets: [{
           label: 'Flag count',
           data: flagRows.map(([, n]) => n),
-          backgroundColor: '#13315C',
+          backgroundColor: flagRows.map(([ft]) =>
+            ft === 'MANDATE_MISMATCH_HIGH' ? '#E63946'
+              : ft === 'MANDATE_MISMATCH_MEDIUM' ? '#D97706'
+              : '#13315C'
+          ),
           borderRadius: 4,
         }],
       },
@@ -1819,7 +1850,9 @@ function downloadPDF() {
     ['Missing Location', fs.missing_location || 0],
     ['Vague Location', fs.vague_location || 0],
     ['Ghost Projects', fs.ghost_projects || 0],
-    ['Mandate Mismatch', fs.mandate_mismatch || 0],
+    ['Mandate Mismatch (HIGH excluded)', fs.mandate_mismatch_high || 0],
+    ['Mandate Mismatch (MEDIUM not-in-scope)', fs.mandate_mismatch_medium || 0],
+    ['Mandate Mismatch (total)', fs.mandate_mismatch || 0],
     ['Overhead Dominance', fs.overhead_dominance || 0],
     ['Composite Duplicate', fs.composite_duplicate || 0],
     ['Inflated Projection', fs.inflated_projection || 0],
