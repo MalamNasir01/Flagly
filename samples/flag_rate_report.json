@@ -1,36 +1,173 @@
 {
-  "sample": "samples/real_2026_fgn_slice.csv — 1000 rows, every-Nth from full 17,873-row parse of 2026 Appropriation Bill Details.pdf (real data, not hand-built)",
-  "before": {
-    "total_items": 1000,
-    "flagged_items": 312,
-    "flag_rate_pct": 31.2,
-    "per_flag": {
-      "INFLATED_AMOUNT": 51,
-      "MISSING_LOCATION": 230,
-      "DUPLICATE_CLUSTER": 66
-    },
-    "note": "Legacy approximation on the same real slice: hard ₦1B inflate ceiling + loose missing-location + token_set≥85 duplicates (any MDA). Not the live UI ~53% figure, which used a different corpus/run."
+  "total_items": 17873,
+  "mda_populated_pct": 100.0,
+  "flagged_items": 3244,
+  "flag_rate_pct": 18.15,
+  "unclassified_count": 11366,
+  "per_flag": {
+    "INFLATED_AMOUNT": 67,
+    "VAGUE_LOCATION": 825,
+    "MISSING_LOCATION": 1011,
+    "DUPLICATE_CLUSTER": 528,
+    "BUDGET_SPLITTING": 548,
+    "MANDATE_MISMATCH": 799,
+    "CONTEXT_MISMATCH": 362,
+    "GHOST_PROJECT": 30
   },
-  "after": {
-    "total_items": 1000,
-    "flagged_items": 116,
-    "flag_rate_pct": 11.6,
-    "unclassified_count": 648,
-    "unclassified_pct": 64.8,
-    "per_flag": {
-      "INFLATED_AMOUNT": 12,
-      "VAGUE_LOCATION": 47,
-      "MISSING_LOCATION": 56,
-      "CONTEXT_MISMATCH": 21,
-      "GHOST_PROJECT": 3
+  "high_risk_before_benchmark_recalibration": 639,
+  "high_risk_after_benchmark_recalibration": 615,
+  "inflated_before": 208,
+  "inflated_after": 67,
+  "top10": [
+    {
+      "rank": 1,
+      "score": 98,
+      "level": "HIGH",
+      "mda": "NIGERIAN ARMY",
+      "amount": 44203698000.0,
+      "flags": [
+        "INFLATED_AMOUNT",
+        "VAGUE_LOCATION"
+      ],
+      "signals": 2,
+      "raw_flags": 2,
+      "description": "CONSTRUCTION OF RESIDENTIAL ACCOMMODATION FOR OFFICERS AND SOLDIERS ACROSS NIGERIAN ARMY BARRACKS"
     },
-    "high": 29,
-    "medium": 81,
-    "low": 6
-  },
-  "decisions": {
-    "classifier": "deterministic keyword→category map in data/category_keywords.json; case-insensitive; tie-break = longest matching keyword, then vocabulary order",
-    "unknown_category": "skip inflated + mandate; report unclassified_count",
-    "duplicates": "same MDA + amount_tolerance_pct 0% + high similarity (98/95)"
-  }
+    {
+      "rank": 2,
+      "score": 98,
+      "level": "HIGH",
+      "mda": "FEDERAL MINISTRY OF POWER -HQTRS",
+      "amount": 17318000000.0,
+      "flags": [
+        "INFLATED_AMOUNT",
+        "MISSING_LOCATION"
+      ],
+      "signals": 2,
+      "raw_flags": 2,
+      "description": "PROVISION OF SOLAR STREET LIGHTS FOR MAJOR HIGHWAYS ACROSS THE 6 GEO- POLITICAL ZONES UNDER RENEWED HOPE LIGHT UP OUR HIGHWAYS PROJECT DOMIC"
+    },
+    {
+      "rank": 3,
+      "score": 98,
+      "level": "HIGH",
+      "mda": "FEDERAL MINISTRY OF YOUTH DEVELOPMENT - HQTRS",
+      "amount": 14000000000.0,
+      "flags": [
+        "INFLATED_AMOUNT",
+        "VAGUE_LOCATION"
+      ],
+      "signals": 2,
+      "raw_flags": 2,
+      "description": "YOUTH EMPOWERMENT PROGRAMMES ACROSS THE NATION WIDE FOR PAYMENTS Budget Office of the Federation               Page 2781 / 2790             "
+    },
+    {
+      "rank": 4,
+      "score": 97,
+      "level": "HIGH",
+      "mda": "FEDERAL MINISTRY OF WORKS",
+      "amount": 6300000000.0,
+      "flags": [
+        "MISSING_LOCATION",
+        "VAGUE_LOCATION",
+        "DUPLICATE_CLUSTER"
+      ],
+      "signals": 2,
+      "raw_flags": 3,
+      "description": "CONSTRUCTION OF ILARA - ISELU SECTION I ROAD PHASE III"
+    },
+    {
+      "rank": 5,
+      "score": 97,
+      "level": "HIGH",
+      "mda": "FEDERAL MINISTRY OF WORKS",
+      "amount": 6300000000.0,
+      "flags": [
+        "MISSING_LOCATION",
+        "VAGUE_LOCATION",
+        "DUPLICATE_CLUSTER"
+      ],
+      "signals": 2,
+      "raw_flags": 3,
+      "description": "CONSTRUCTION OF ILARA - ISELU SECTION I ROAD PHASE II"
+    },
+    {
+      "rank": 6,
+      "score": 96,
+      "level": "HIGH",
+      "mda": "NIGERIA CORRECTIONAL SERVICE",
+      "amount": 5063596810.0,
+      "flags": [
+        "INFLATED_AMOUNT",
+        "VAGUE_LOCATION"
+      ],
+      "signals": 2,
+      "raw_flags": 2,
+      "description": "CONSTRUCTION/REHABILITATION OF CUSTODIAL CENTRES AND BARRACKS NATIONWIDE"
+    },
+    {
+      "rank": 7,
+      "score": 95,
+      "level": "HIGH",
+      "mda": "NIGERIAN BUILDING AND ROAD RESEARCH INSTITUTE - LAGOS",
+      "amount": 3500000000.0,
+      "flags": [
+        "MISSING_LOCATION",
+        "VAGUE_LOCATION",
+        "DUPLICATE_CLUSTER",
+        "BUDGET_SPLITTING"
+      ],
+      "signals": 2,
+      "raw_flags": 4,
+      "description": "CONSTRUCTION/REHABILITATION OF RURAL AND TOWNSHIP ROADS IN SELECTED LOCATIONS IN THE SOUTHEAST REGION (MULTIPLE LOTS)"
+    },
+    {
+      "rank": 8,
+      "score": 95,
+      "level": "HIGH",
+      "mda": "NIGERIAN BUILDING AND ROAD RESEARCH INSTITUTE - LAGOS",
+      "amount": 3500000000.0,
+      "flags": [
+        "MISSING_LOCATION",
+        "VAGUE_LOCATION",
+        "DUPLICATE_CLUSTER",
+        "BUDGET_SPLITTING"
+      ],
+      "signals": 2,
+      "raw_flags": 4,
+      "description": "CONSTRUCTION/REHABILITATION OF RURAL AND TOWNSHIP ROADS IN SELECTED LOCATIONS IN THE SOUTH-WEST REGION (MULTIPLE LOTS)"
+    },
+    {
+      "rank": 9,
+      "score": 95,
+      "level": "HIGH",
+      "mda": "NIGERIAN BUILDING AND ROAD RESEARCH INSTITUTE - LAGOS",
+      "amount": 3500000000.0,
+      "flags": [
+        "MISSING_LOCATION",
+        "VAGUE_LOCATION",
+        "DUPLICATE_CLUSTER",
+        "BUDGET_SPLITTING"
+      ],
+      "signals": 2,
+      "raw_flags": 4,
+      "description": "CONSTRUCTION/REHABILITATION OF RURAL AND TOWNSHIP ROADS IN SELECTED LOCATIONS IN THE SOUTH-SOUTH REGION (MULTIPLE LOTS)"
+    },
+    {
+      "rank": 10,
+      "score": 95,
+      "level": "HIGH",
+      "mda": "NIGERIAN BUILDING AND ROAD RESEARCH INSTITUTE - LAGOS",
+      "amount": 3500000000.0,
+      "flags": [
+        "MISSING_LOCATION",
+        "VAGUE_LOCATION",
+        "DUPLICATE_CLUSTER",
+        "BUDGET_SPLITTING"
+      ],
+      "signals": 2,
+      "raw_flags": 4,
+      "description": "CONSTRUCTION/REHABILITATION OF RURAL AND TOWNSHIP ROADS IN SELECTED LOCATIONS IN THE NORTHEAST REGION (MULTIPLE LOTS)"
+    }
+  ]
 }

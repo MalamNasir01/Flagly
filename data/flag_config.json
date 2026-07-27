@@ -1,78 +1,153 @@
 {
   "_meta": {
     "purpose": "Tunable thresholds for Flagly flag engines. Seed JSON schemas for mda_mandates and vague_location_phrases are separate and unchanged.",
-    "version": "1.0",
-    "notes": "Inflated Amount uses category benchmark * multiplier. Unknown category skips inflation and mandate checks."
+    "version": "1.1",
+    "notes": "Inflated Amount uses category benchmark * multiplier. Categories with benchmark_tiers pick a large-facility benchmark when description keywords match. Unknown category skips inflation and mandate checks. Scoring collapses overlapping location/price flags into one signal each."
   },
   "inflated": {
     "multiplier": 3.0,
     "high_multiplier": 5.0,
     "benchmarks_ngn": {
-      "roads": 3000000000,
-      "road_maintenance": 1500000000,
-      "bridges": 3000000000,
-      "rail": 10000000000,
-      "airports": 5000000000,
-      "ports": 5000000000,
-      "water_transport": 2000000000,
-      "housing": 2000000000,
-      "urban_infrastructure": 1000000000,
-      "health_facilities": 3000000000,
-      "medical_equipment": 500000000,
-      "pharmaceuticals": 300000000,
-      "disease_control": 500000000,
-      "primary_schools": 600000000,
-      "secondary_schools": 800000000,
-      "tertiary_education": 2000000000,
-      "vocational_training": 300000000,
-      "educational_materials": 150000000,
-      "agriculture_inputs": 500000000,
-      "irrigation": 2000000000,
-      "livestock": 300000000,
-      "fisheries": 300000000,
-      "food_storage": 500000000,
-      "water_supply": 60000000,
-      "sanitation": 100000000,
-      "dams": 5000000000,
-      "electricity_generation": 5000000000,
-      "electricity_distribution": 2000000000,
-      "renewable_energy": 1000000000,
-      "oil_gas": 5000000000,
-      "solid_minerals": 1000000000,
-      "ict_infrastructure": 500000000,
-      "broadcasting": 300000000,
-      "postal_services": 200000000,
-      "financial_regulation": 200000000,
-      "taxation": 200000000,
-      "customs": 300000000,
+      "roads": 5000000000,
+      "road_maintenance": 2000000000,
+      "bridges": 5000000000,
+      "rail": 20000000000,
+      "airports": 15000000000,
+      "ports": 10000000000,
+      "water_transport": 3000000000,
+      "housing": 3000000000,
+      "urban_infrastructure": 2000000000,
+      "health_facilities": 4000000000,
+      "medical_equipment": 800000000,
+      "pharmaceuticals": 500000000,
+      "disease_control": 800000000,
+      "primary_schools": 800000000,
+      "secondary_schools": 1200000000,
+      "tertiary_education": 4000000000,
+      "vocational_training": 500000000,
+      "educational_materials": 200000000,
+      "agriculture_inputs": 800000000,
+      "irrigation": 3000000000,
+      "livestock": 500000000,
+      "fisheries": 500000000,
+      "food_storage": 800000000,
+      "water_supply": 500000000,
+      "sanitation": 300000000,
+      "dams": 10000000000,
+      "electricity_generation": 10000000000,
+      "electricity_distribution": 4000000000,
+      "renewable_energy": 2000000000,
+      "oil_gas": 10000000000,
+      "solid_minerals": 2000000000,
+      "ict_infrastructure": 1000000000,
+      "broadcasting": 500000000,
+      "postal_services": 300000000,
+      "financial_regulation": 300000000,
+      "taxation": 300000000,
+      "customs": 500000000,
       "military_equipment": 16000000000,
-      "policing": 1000000000,
-      "immigration": 300000000,
-      "corrections": 500000000,
-      "fire_service": 200000000,
-      "disaster_response": 500000000,
-      "refugee_support": 300000000,
-      "social_welfare": 300000000,
-      "youth_programs": 200000000,
-      "sports_facilities": 500000000,
-      "cultural_facilities": 300000000,
-      "tourism_facilities": 300000000,
-      "markets": 400000000,
-      "industrial_parks": 2000000000,
-      "trade_facilitation": 300000000,
-      "environmental_protection": 300000000,
-      "climate_action": 300000000,
-      "forestry": 200000000,
-      "gender_programs": 150000000,
-      "child_welfare": 150000000,
-      "labour_programs": 150000000,
-      "diplomacy": 500000000,
-      "justice_administration": 300000000,
-      "research_development": 300000000,
-      "population_data": 200000000,
-      "elections": 1000000000,
-      "identity_management": 500000000,
+      "policing": 1500000000,
+      "immigration": 500000000,
+      "corrections": 800000000,
+      "fire_service": 400000000,
+      "disaster_response": 800000000,
+      "refugee_support": 500000000,
+      "social_welfare": 500000000,
+      "youth_programs": 300000000,
+      "sports_facilities": 2000000000,
+      "cultural_facilities": 1000000000,
+      "tourism_facilities": 1000000000,
+      "markets": 800000000,
+      "industrial_parks": 5000000000,
+      "trade_facilitation": 500000000,
+      "environmental_protection": 500000000,
+      "climate_action": 500000000,
+      "forestry": 400000000,
+      "gender_programs": 200000000,
+      "child_welfare": 200000000,
+      "labour_programs": 200000000,
+      "diplomacy": 800000000,
+      "justice_administration": 500000000,
+      "research_development": 500000000,
+      "population_data": 400000000,
+      "elections": 2000000000,
+      "identity_management": 1000000000,
       "recurrent_admin": 500000000
+    },
+    "benchmark_tiers": {
+      "sports_facilities": {
+        "large_keywords": [
+          "stadium",
+          "national stadium",
+          "sports complex",
+          "olympic",
+          "arena",
+          "sports city"
+        ],
+        "large_benchmark_ngn": 20000000000
+      },
+      "health_facilities": {
+        "large_keywords": [
+          "teaching hospital",
+          "federal medical centre",
+          "federal medical center",
+          "specialist hospital",
+          "national hospital",
+          "tertiary hospital"
+        ],
+        "large_benchmark_ngn": 20000000000
+      },
+      "housing": {
+        "large_keywords": [
+          "housing estate",
+          "mass housing",
+          "new city",
+          "residential estate"
+        ],
+        "large_benchmark_ngn": 15000000000
+      },
+      "roads": {
+        "large_keywords": [
+          "expressway",
+          "dual carriageway",
+          "highway",
+          "express way",
+          "superhighway"
+        ],
+        "large_benchmark_ngn": 25000000000
+      },
+      "bridges": {
+        "large_keywords": ["cable stayed", "suspension bridge", "major bridge", "flyover"],
+        "large_benchmark_ngn": 20000000000
+      },
+      "airports": {
+        "large_keywords": ["international airport", "terminal building", "runway"],
+        "large_benchmark_ngn": 40000000000
+      },
+      "rail": {
+        "large_keywords": ["standard gauge", "railway corridor", "rail line"],
+        "large_benchmark_ngn": 50000000000
+      },
+      "dams": {
+        "large_keywords": ["hydro", "multipurpose dam", "hydropower"],
+        "large_benchmark_ngn": 40000000000
+      },
+      "electricity_generation": {
+        "large_keywords": ["power plant", "megawatt", "thermal plant", "gas turbine"],
+        "large_benchmark_ngn": 40000000000
+      },
+      "tertiary_education": {
+        "large_keywords": ["university campus", "teaching hospital", "college of medicine"],
+        "large_benchmark_ngn": 15000000000
+      },
+      "cultural_facilities": {
+        "large_keywords": ["national theatre", "cultural centre", "cultural center", "museum complex"],
+        "large_benchmark_ngn": 10000000000
+      },
+      "industrial_parks": {
+        "large_keywords": ["industrial park", "special economic zone", "export processing"],
+        "large_benchmark_ngn": 20000000000
+      }
     }
   },
   "duplicates": {
@@ -133,5 +208,16 @@
     "enabled": true,
     "under_amount_ngn": 1000000000,
     "multiplier": 3.0
+  },
+  "scoring": {
+    "top_n": 50,
+    "overlap_groups": {
+      "location_quality": ["MISSING_LOCATION", "VAGUE_LOCATION", "VAGUE_HIGH_VALUE"],
+      "price_anomaly": ["INFLATED_AMOUNT", "INFLATED_PROJECTION", "CONTEXT_MISMATCH"],
+      "duplication": ["DUPLICATE_CLUSTER", "COMPOSITE_DUPLICATE", "BUDGET_SPLITTING"],
+      "mandate": ["MANDATE_MISMATCH"],
+      "ghost": ["GHOST_PROJECT", "PHANTOM_SPENDING", "ZERO_ROLLOVER"],
+      "overhead": ["OVERHEAD_DOMINANCE"]
+    }
   }
 }

@@ -37,9 +37,14 @@ ECONOMIC_CODE_B_RE = re.compile(r'\b(2[123]\d{6})\b')
 FUNCTION_CODE_B_RE = re.compile(r'\b(7\d{4})\b')
 LOCATION_CODE_B_RE = re.compile(r'\b(1[0-9]\d{6})\b')
 
-# MDA section header: exactly 10-digit code followed by MDA name
+# MDA section header: 10-digit code + MDA name (pdftotext -layout often uses 8+ spaces).
+# Reject lines that look like project rows (ONGOING/NEW + amount).
 FORMAT_C_SECTION_RE = re.compile(
-    r'^(\d{10})\s{1,6}([A-Z][A-Z0-9\s/\-&,.()\[\]]{4,100})$'
+    r"^(\d{10})\s{2,}([A-Z][A-Z0-9\s/\-&,.()'’:\[\]]{3,160})$"
+)
+FORMAT_C_SECTION_REJECT_RE = re.compile(
+    r'\b(ONGOING|NEW)\b|[\d,]{6,}\.\d{2}\s*$',
+    re.IGNORECASE,
 )
 
 # Expenditure-type lines: 21xx Personnel, 22xx Overhead, 23xx Capital sub-breakdowns
@@ -70,6 +75,7 @@ _NIGERIA_STATES_RE = re.compile(
 )
 
 MAX_ROWS_FORMAT_C = None  # No row cap — scan full federal project-level PDFs end to end.
+FORMAT_C_DESC_MAX = 500  # Keep enough text for domicile / location phrases in reports.
 
 
 # ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -467,9 +473,37 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
     current_mda_code = None
     current_expenditure_code = None
     pages_parsed = 0
+    section_headers_seen = 0
+
+    def _apply_section_header(stripped: str) -> bool:
+        """Update current MDA from a section header line. Returns True if consumed."""
+        nonlocal current_ministry, current_mda_code, current_expenditure_code, section_headers_seen
+        section_m = FORMAT_C_SECTION_RE.match(stripped)
+        if not section_m:
+            return False
+        name = section_m.group(2).strip()
+        if FORMAT_C_SECTION_REJECT_RE.search(name):
+            return False
+        # Avoid mistaking long numeric/code soup for an MDA title
+        if not re.search(r'[A-Z]{3,}', name):
+            return False
+        current_mda_code = section_m.group(1).strip()
+        current_ministry = name[:160]
+        current_expenditure_code = None
+        section_headers_seen += 1
+        return True
 
     for page_text in pages:
-        # Skip summary / header-only pages
+        lines = page_text.splitlines()
+
+        # Always harvest MDA section headers — even on pages we skip for projects —
+        # so ministry state carries into the next project page.
+        for line in lines:
+            stripped = line.strip()
+            if stripped:
+                _apply_section_header(stripped)
+
+        # Skip summary / header-only pages for project extraction
         if FORMAT_C_SKIP_RE.search(page_text):
             continue
         # Must have at least one type keyword to be worth parsing
@@ -480,7 +514,6 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
             continue
 
         pages_parsed += 1
-        lines = page_text.splitlines()
         prev_row = None
 
         for line in lines:
@@ -489,11 +522,7 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
                 continue
 
             # ── MDA section header? ───────────────────────────────────────────
-            section_m = FORMAT_C_SECTION_RE.match(stripped)
-            if section_m:
-                current_mda_code = section_m.group(1).strip()
-                current_ministry = section_m.group(2).strip()[:120]
-                current_expenditure_code = None
+            if _apply_section_header(stripped):
                 prev_row = None
                 continue
 
@@ -549,10 +578,11 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
                     continue
 
                 location = _extract_location_c(desc_part)
+                desc_store = desc_part[:FORMAT_C_DESC_MAX]
 
                 row_dict = {
                     'row_id':           None,
-                    'description':      desc_part[:200],
+                    'description':      desc_store,
                     'amount':           amount_val,
                     'location':         location,
                     'ministry':         current_ministry,
@@ -560,7 +590,7 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
                     'is_mda_level':     False,
                     'mda_code':         current_mda_code,
                     'mda_name':         current_ministry,
-                    'project_name':     desc_part[:200],
+                    'project_name':     desc_store,
                     'project_status':   status_val,
                     'expenditure_code': current_expenditure_code,
                 }
@@ -582,15 +612,19 @@ def _parse_pdf_format_c(contents: bytes) -> pd.DataFrame:
                     and not re.search(r'[\d,]{5,}\s*$', stripped)
                     and not FORMAT_C_SECTION_RE.match(stripped)):
                 cur = prev_row['description']
-                merged = (cur + ' ' + stripped)[:200]
+                merged = (cur + ' ' + stripped)[:FORMAT_C_DESC_MAX]
                 prev_row['description'] = merged
+                prev_row['project_name'] = merged
                 if not prev_row['location']:
                     prev_row['location'] = _extract_location_c(merged)
 
     ergp_rows = [r for r in rows if r.get('project_code') and r['project_code'].startswith('ERGP')]
+    mda_populated = sum(1 for r in rows if r.get('mda_name'))
     print(f"[diag] FORMAT C ROWS WITH ERGP CODES: {len(ergp_rows)}")
     print(f"[diag] TOTAL ROWS COLLECTED: {len(rows)}")
     print(f"[diag] PAGES THAT PASSED ALL GUARDS: {pages_parsed}")
+    print(f"[diag] MDA SECTION HEADERS SEEN: {section_headers_seen}")
+    print(f"[diag] ROWS WITH MDA NAME: {mda_populated}/{len(rows)}")
     if ergp_rows:
         print(f"[diag] SAMPLE: {ergp_rows[0]}")
     elif rows:

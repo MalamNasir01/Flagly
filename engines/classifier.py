@@ -92,18 +92,20 @@ def classify_with_match(description: str) -> Tuple[Optional[str], Optional[str]]
     return (best[2], best_kw) if best else (None, None)
 
 
-def get_flag_config() -> dict:
-    """Reload from disk so config edits apply without process restart."""
+def get_flag_config(reload: bool = False) -> dict:
+    """Return flag_config.json (cached). Pass reload=True after editing the file."""
     global _FLAG_CONFIG
-    _FLAG_CONFIG = _load_json('flag_config.json', _FLAG_CONFIG or {})
+    if reload or not _FLAG_CONFIG:
+        _FLAG_CONFIG = _load_json('flag_config.json', _FLAG_CONFIG or {})
     return _FLAG_CONFIG
 
 
 def reload_classifier_data() -> None:
-    """Reload keyword maps and vocabulary (for tests / hot config)."""
-    global _KEYWORDS_DOC, _MANDATES_DOC, VOCABULARY, CATEGORY_KEYWORDS, _VOCAB_INDEX, _KEYWORD_INDEX
+    """Reload keyword maps, vocabulary, and flag config (for tests / hot config)."""
+    global _KEYWORDS_DOC, _MANDATES_DOC, VOCABULARY, CATEGORY_KEYWORDS, _VOCAB_INDEX, _KEYWORD_INDEX, _FLAG_CONFIG
     _KEYWORDS_DOC = _load_json('category_keywords.json', {})
     _MANDATES_DOC = _load_json('mda_mandates.json', {})
+    _FLAG_CONFIG = _load_json('flag_config.json', {})
     VOCABULARY = list(
         (_MANDATES_DOC.get('_meta') or {}).get('category_vocabulary')
         or list((_KEYWORDS_DOC.get('categories') or {}).keys())
@@ -116,10 +118,42 @@ def reload_classifier_data() -> None:
     _KEYWORD_INDEX = _sorted_keyword_index()
 
 
-def get_inflated_benchmark(category: str) -> Optional[float]:
-    benchmarks = ((_FLAG_CONFIG.get('inflated') or {}).get('benchmarks_ngn') or {})
-    val = benchmarks.get(category)
-    return float(val) if val is not None else None
+def get_inflated_benchmark(category: str, description: Optional[str] = None) -> Optional[float]:
+    """Return the Naira benchmark for a category.
+
+    If ``benchmark_tiers`` defines large_keywords for the category and the
+    description matches any of them, use ``large_benchmark_ngn`` (national-scale
+    facilities). Otherwise use the flat ``benchmarks_ngn`` value (local/small).
+    """
+    meta = get_inflated_benchmark_meta(category, description)
+    return meta.get('benchmark')
+
+
+def get_inflated_benchmark_meta(category: str, description: Optional[str] = None) -> dict:
+    """Return benchmark + which tier was selected (for evidence)."""
+    cfg = get_flag_config()
+    inflated = cfg.get('inflated') or {}
+    benchmarks = inflated.get('benchmarks_ngn') or {}
+    base = benchmarks.get(category)
+    if base is None:
+        return {'benchmark': None, 'tier': None, 'matched_tier_keyword': None}
+    tiers = (inflated.get('benchmark_tiers') or {}).get(category) or {}
+    large_kws = [str(k).lower() for k in (tiers.get('large_keywords') or [])]
+    large_bench = tiers.get('large_benchmark_ngn')
+    if description and large_kws and large_bench is not None:
+        text = description.lower()
+        for kw in sorted(large_kws, key=len, reverse=True):
+            if kw and kw in text:
+                return {
+                    'benchmark': float(large_bench),
+                    'tier': 'large',
+                    'matched_tier_keyword': kw,
+                }
+    return {
+        'benchmark': float(base),
+        'tier': 'default',
+        'matched_tier_keyword': None,
+    }
 
 
 def get_inflated_multiplier() -> float:

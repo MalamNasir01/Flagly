@@ -216,10 +216,11 @@ def flag_inflated_amount(row: Dict) -> Optional[Dict]:
     """Flag only when amount exceeds category benchmark * configured multiplier.
 
     Unknown category: skip (no benchmark = no flag). No flat ₦1B fallback.
+    Uses large-facility tier when description matches tier keywords.
     """
     from engines.classifier import (
         classify_with_match,
-        get_inflated_benchmark,
+        get_inflated_benchmark_meta,
         get_inflated_multiplier,
         get_inflated_high_multiplier,
     )
@@ -238,7 +239,8 @@ def flag_inflated_amount(row: Dict) -> Optional[Dict]:
     if not category:
         return None
 
-    benchmark = get_inflated_benchmark(category)
+    meta = get_inflated_benchmark_meta(category, description)
+    benchmark = meta.get('benchmark')
     if benchmark is None or benchmark <= 0:
         return None
 
@@ -251,12 +253,19 @@ def flag_inflated_amount(row: Dict) -> Optional[Dict]:
         return None
 
     severity = 'HIGH' if amount > high_threshold else 'MEDIUM'
+    tier = meta.get('tier') or 'default'
+    tier_note = (
+        f' (large-facility tier via "{meta.get("matched_tier_keyword")}")'
+        if tier == 'large' and meta.get('matched_tier_keyword')
+        else ' (default tier)'
+    )
     return {
         'flag_type': 'INFLATED_AMOUNT',
         'severity': severity,
         'title': 'Inflated Amount',
         'explanation': (
-            f'This line item is priced at {_fmt_amount(amount)} for a {category} project. '
+            f'This line item is priced at {_fmt_amount(amount)} for a {category} project'
+            f'{tier_note}. '
             f'The category benchmark is {_fmt_amount(benchmark)} and the scanner flags amounts '
             f'above {multiplier:g} times that benchmark ({_fmt_amount(threshold)}). '
             f'Cross reference against BPP Price Intelligence before drawing any conclusion.'
@@ -266,6 +275,8 @@ def flag_inflated_amount(row: Dict) -> Optional[Dict]:
             'category': category,
             'matched_keyword': matched_kw,
             'benchmark': benchmark,
+            'benchmark_tier': tier,
+            'matched_tier_keyword': meta.get('matched_tier_keyword'),
             'multiplier': multiplier,
             'threshold': threshold,
             'amount': amount,
@@ -1105,11 +1116,21 @@ def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
         print(f"[flags] unclassified lines: {unclassified} of {len(rows)} "
               f"({100.0 * unclassified / max(len(rows), 1):.1f}%)")
 
-    # Detect Format B (Niger State): has mda_code values
-    is_format_b = (
-        'mda_code' in df.columns
-        and df['mda_code'].notna().any()
-    )
+    # Format B (state YoY sheets) carries multi-year amount columns / 8-digit economic codes.
+    # Do NOT use mda_code presence — Format C also fills 10-digit MDA codes from section headers.
+    is_format_b = False
+    if 'actuals_2024' in df.columns and df['actuals_2024'].notna().any():
+        is_format_b = True
+    elif 'economic_code' in df.columns and df['economic_code'].notna().any():
+        is_format_b = True
+    elif 'mda_code' in df.columns:
+        # Legacy Format B MDA codes are 12-digit; Format C section codes are 10-digit.
+        sample_codes = (
+            df['mda_code'].dropna().astype(str).str.strip()
+            .head(50)
+        )
+        if any(len(c) == 12 and c.isdigit() for c in sample_codes):
+            is_format_b = True
 
     all_descriptions = [_str_cell(r.get('description') or r.get('project_name')) for r in rows]
 

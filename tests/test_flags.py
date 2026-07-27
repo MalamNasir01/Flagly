@@ -78,12 +78,33 @@ class InflatedAmountTests(unittest.TestCase):
         self.assertIsNone(flag_inflated_amount(row))
 
     def test_relative_benchmark_flags_extreme(self):
-        # water_supply benchmark 60M * 3 = 180M
-        row = _row(description='Borehole drilling for rural water supply', amount=900_000_000, location='Niger')
+        # water_supply default benchmark 500M * 3 = 1.5B
+        row = _row(description='Borehole drilling for rural water supply', amount=5_000_000_000, location='Niger')
         flag = flag_inflated_amount(row)
         self.assertIsNotNone(flag)
         self.assertEqual(flag['flag_type'], 'INFLATED_AMOUNT')
         self.assertEqual(flag['evidence']['rule'], 'relative_benchmark')
+
+    def test_stadium_uses_large_tier_not_flagged(self):
+        # 9.8B stadium: large tier 20B * 3 = 60B → should NOT flag
+        row = _row(
+            description='Construction of national stadium complex',
+            amount=9_800_000_000,
+            location='Abuja',
+            mda_name='FEDERAL MINISTRY OF YOUTH AND SPORTS',
+        )
+        self.assertIsNone(flag_inflated_amount(row))
+
+    def test_small_sports_field_still_flags_extreme(self):
+        # Local pitch without stadium keywords: default 2B * 3 = 6B; 20B should flag
+        row = _row(
+            description='Upgrade of community sporting facility pitch and stands',
+            amount=20_000_000_000,
+            location='Kano',
+        )
+        flag = flag_inflated_amount(row)
+        self.assertIsNotNone(flag)
+        self.assertEqual(flag['evidence']['benchmark_tier'], 'default')
 
 
 class MissingLocationTests(unittest.TestCase):
@@ -158,6 +179,29 @@ class MandateMismatchTests(unittest.TestCase):
         # renewable_energy is not in FERMA scope or excluded → MEDIUM
         self.assertEqual(flag['severity'], 'MEDIUM')
 
+    def test_ferma_solar_domiciled_in_power(self):
+        row = _row(
+            description=(
+                'Supply and Installation of Solar Street Lights domiciled in '
+                'Federal Ministry of Power'
+            ),
+            amount=400_000_000,
+            location=None,
+            mda_name='FEDERAL ROAD MAINTENANCE AGENCY',
+        )
+        flag = flag_mandate_mismatch(row)
+        self.assertIsNotNone(flag)
+        self.assertEqual(flag['flag_type'], 'MANDATE_MISMATCH')
+        self.assertEqual(flag['evidence']['project_category'], 'renewable_energy')
+
+    def test_power_ministry_solar_in_scope(self):
+        row = _row(
+            description='Supply & Installation of Solar Street Lights',
+            amount=250_000_000,
+            mda_name='Federal Ministry of Power',
+        )
+        self.assertIsNone(flag_mandate_mismatch(row))
+
     def test_unclassified_skips_mandate(self):
         row = _row(
             description='Miscellaneous contingency for unforeseen needs',
@@ -203,6 +247,62 @@ class UnclassifiedStatsTests(unittest.TestCase):
         stats = get_last_run_stats()
         self.assertEqual(stats['unclassified_count'], 1)
         self.assertEqual(stats['total_items'], 2)
+
+
+class ScoringDedupeTests(unittest.TestCase):
+    def test_stacked_location_flags_do_not_triple_score(self):
+        from engines.scorer import score_item, collapse_flags_for_scoring
+
+        stacked = {
+            'description': 'Empowerment in selected locations',
+            'amount': 50_000_000,
+            'flags': [
+                {'flag_type': 'INFLATED_AMOUNT', 'severity': 'HIGH'},
+                {'flag_type': 'MISSING_LOCATION', 'severity': 'HIGH'},
+                {'flag_type': 'VAGUE_LOCATION', 'severity': 'HIGH'},
+            ],
+        }
+        collapsed = collapse_flags_for_scoring(stacked['flags'])
+        self.assertEqual(len(collapsed), 2)  # price + location, not 3
+        score_item(stacked)
+        # One HIGH price + one HIGH location → severity 6*8 + 5 = 53 + base 10 + amount ~10
+        self.assertLessEqual(stacked['risk_score'], 100)
+        self.assertEqual(stacked['scoring_signal_count'], 2)
+        self.assertEqual(stacked['raw_flag_count'], 3)
+
+    def test_rank_and_shortlist(self):
+        from engines.scorer import score_items
+        items = [
+            {'description': 'a', 'amount': 1e9, 'flags': [{'flag_type': 'GHOST_PROJECT', 'severity': 'HIGH'}]},
+            {'description': 'b', 'amount': 1e6, 'flags': [{'flag_type': 'MISSING_LOCATION', 'severity': 'MEDIUM'}]},
+            {'description': 'c', 'amount': 5e9, 'flags': [
+                {'flag_type': 'INFLATED_AMOUNT', 'severity': 'HIGH'},
+                {'flag_type': 'MANDATE_MISMATCH', 'severity': 'HIGH'},
+            ]},
+        ]
+        scored = score_items(items, top_n=2)
+        self.assertEqual(scored[0]['rank'], 1)
+        self.assertTrue(scored[0]['on_shortlist'])
+        self.assertTrue(scored[1]['on_shortlist'])
+        self.assertFalse(scored[2]['on_shortlist'])
+        self.assertGreaterEqual(scored[0]['risk_score'], scored[1]['risk_score'])
+
+
+class FormatCSectionHeaderTests(unittest.TestCase):
+    def test_section_header_matches_eight_space_layout(self):
+        from engines.parser import FORMAT_C_SECTION_RE, FORMAT_C_SECTION_REJECT_RE
+        line = '0234004001        FEDERAL ROAD MAINTENANCE AGENCY'
+        m = FORMAT_C_SECTION_RE.match(line)
+        self.assertIsNotNone(m)
+        self.assertEqual(m.group(1), '0234004001')
+        self.assertEqual(m.group(2).strip(), 'FEDERAL ROAD MAINTENANCE AGENCY')
+        self.assertIsNone(FORMAT_C_SECTION_REJECT_RE.search(m.group(2)))
+
+    def test_section_header_rejects_project_like_lines(self):
+        from engines.parser import FORMAT_C_SECTION_RE, FORMAT_C_SECTION_REJECT_RE
+        # Would match the shape but should be rejected by reject regex when used together
+        name = 'SOME PROJECT TITLE ONGOING 1,000,000.00'
+        self.assertTrue(FORMAT_C_SECTION_REJECT_RE.search(name))
 
 
 if __name__ == '__main__':

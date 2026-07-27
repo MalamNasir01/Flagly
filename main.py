@@ -114,6 +114,7 @@ def summarize_scan(df: pd.DataFrame, results: List[Dict]) -> Dict[str, Any]:
     low_risk = sum(1 for r in results if r.get("risk_level") == "LOW")
     at_risk_amount = sum(safe_float(r.get("amount") or 0) for r in results)
     stats = get_last_run_stats()
+    shortlist = [r for r in results if r.get("on_shortlist")]
     return {
         "total_items": total_items,
         "flagged_items": len(results),
@@ -124,6 +125,7 @@ def summarize_scan(df: pd.DataFrame, results: List[Dict]) -> Dict[str, Any]:
         "total_amount": total_amount,
         "flag_summary": build_flag_summary(results),
         "results": results,
+        "shortlist": shortlist,
         "unclassified_count": stats.get("unclassified_count", 0),
         "flag_rate": (len(results) / total_items) if total_items else 0.0,
     }

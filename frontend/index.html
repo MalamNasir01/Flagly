@@ -235,12 +235,20 @@ tbody td{padding:11px 12px;font-size:12px;vertical-align:middle}
 
 /* Visuals */
 .visuals-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
-.chart-card{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:20px}
-.chart-card h3{font-size:14px;font-family:'Inter',sans-serif;font-weight:700;margin-bottom:14px;color:var(--navy-900)}
-.chart-card canvas{max-height:280px}
-.unlocated-counter{background:var(--navy-900);color:#fff;border-radius:12px;padding:24px;text-align:center;margin-bottom:20px}
-.unlocated-counter .num{font-family:'Playfair Display',serif;font-size:42px;font-weight:700;color:var(--red-500)}
-.unlocated-counter .lbl{font-size:13px;color:rgba(255,255,255,0.7);margin-top:4px}
+.visuals-grid .chart-card.full{grid-column:1 / -1}
+.chart-card{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:20px;min-height:120px;position:relative}
+.chart-card h3{font-size:14px;font-family:'Inter',sans-serif;font-weight:700;margin-bottom:6px;color:var(--navy-900)}
+.chart-card .chart-sub{font-size:12px;color:var(--ink-600);margin-bottom:12px;line-height:1.4}
+.chart-card .chart-wrap{position:relative;width:100%;min-height:220px}
+.chart-card .chart-wrap.tall{min-height:420px}
+.chart-card canvas{width:100% !important;max-height:none}
+.chart-empty{display:flex;align-items:center;justify-content:center;min-height:180px;color:var(--ink-600);font-size:13px;font-weight:500;background:var(--bg-alt);border-radius:8px}
+.visuals-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
+.visuals-stat{background:var(--navy-900);color:#fff;border-radius:12px;padding:22px 20px;text-align:center}
+.visuals-stat .num{font-family:'Playfair Display',serif;font-size:34px;font-weight:700;color:var(--red-500);line-height:1.1;word-break:break-word}
+.visuals-stat .lbl{font-size:12px;color:rgba(255,255,255,0.72);margin-top:8px;line-height:1.4}
+.visuals-stat .sub{font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px}
+.unlocated-counter{display:none}
 
 /* Slide-over panel */
 .panel-overlay{display:none;position:fixed;inset:0;background:rgba(11,37,69,0.4);z-index:1000}
@@ -288,6 +296,8 @@ tbody td{padding:11px 12px;font-size:12px;vertical-align:middle}
   .for-grid{grid-template-columns:repeat(2,1fr)}
   .hero-grid{grid-template-columns:1fr}
   .visuals-grid{grid-template-columns:1fr}
+  .visuals-stats{grid-template-columns:1fr}
+  .chart-card .chart-wrap.tall{min-height:360px}
 }
 @media(max-width:768px){
   .nav-links{display:none}
@@ -299,6 +309,7 @@ tbody td{padding:11px 12px;font-size:12px;vertical-align:middle}
   .results-header{flex-direction:column;align-items:flex-start}
   .search-box{width:100%}
   .panel{width:100%}
+  .visuals-stat .num{font-size:28px}
   thead th:nth-child(2),tbody td:nth-child(2),
   thead th:nth-child(3),tbody td:nth-child(3){display:none}
 }
@@ -523,15 +534,49 @@ tbody td{padding:11px 12px;font-size:12px;vertical-align:middle}
       </div>
 
       <div class="tab-panel" id="tabVisuals">
-        <div class="unlocated-counter" id="unlocatedCounter">
-          <div class="num" id="unlocatedNum">0</div>
-          <div class="lbl">flagged items with no verifiable location</div>
+        <div class="visuals-stats" id="visualsStats">
+          <div class="visuals-stat">
+            <div class="num" id="statUnlocatedNum">—</div>
+            <div class="lbl">items with no verifiable location</div>
+          </div>
+          <div class="visuals-stat">
+            <div class="num" id="statFlaggedSpend">—</div>
+            <div class="lbl">total flagged spend</div>
+            <div class="sub" id="statFlaggedSpendSub"></div>
+          </div>
+          <div class="visuals-stat">
+            <div class="num" id="statFlaggedPct">—</div>
+            <div class="lbl">of scanned budget flagged</div>
+            <div class="sub" id="statFlaggedPctSub"></div>
+          </div>
         </div>
         <div class="visuals-grid">
-          <div class="chart-card"><h3>Risk distribution</h3><canvas id="chartRisk"></canvas></div>
-          <div class="chart-card"><h3>Top 15 MDA by flagged spend</h3><canvas id="chartMda"></canvas></div>
+          <div class="chart-card full">
+            <h3>Top 15 MDA by flagged spend</h3>
+            <div class="chart-sub" id="mdaChartSub">Segmented by risk level. Unknown only when MDA could not be attributed.</div>
+            <div class="chart-wrap tall" id="chartMdaWrap"><canvas id="chartMda"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <h3>Flags by type</h3>
+            <div class="chart-sub">What is driving the scan results</div>
+            <div class="chart-wrap" id="chartFlagsWrap"><canvas id="chartFlags"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <h3>Risk distribution</h3>
+            <div class="chart-sub">Share of flagged items by risk band</div>
+            <div class="chart-wrap" id="chartRiskWrap"><canvas id="chartRisk"></canvas></div>
+          </div>
+          <div class="chart-card full">
+            <h3>Flagged spend by project category</h3>
+            <div class="chart-sub">Vocabulary categories from the classifier (roads, housing, sports_facilities…)</div>
+            <div class="chart-wrap tall" id="chartCategoryWrap"><canvas id="chartCategory"></canvas></div>
+          </div>
+          <div class="chart-card full" id="yearChartWrap" style="display:none">
+            <h3>Flagged spend by year</h3>
+            <div class="chart-sub">Multi-year upload comparison</div>
+            <div class="chart-wrap" id="chartYearWrapInner"><canvas id="chartYear"></canvas></div>
+          </div>
         </div>
-        <div class="chart-card" id="yearChartWrap" style="display:none"><h3>Flagged spend by year</h3><canvas id="chartYear"></canvas></div>
       </div>
     </div>
   </div>
@@ -1011,61 +1056,398 @@ function destroyCharts() {
   chartInstances = {};
 }
 
+function resultMdaName(r) {
+  const raw = (r && (r.mda_name || r.ministry) || '').toString().trim();
+  if (!raw || /^n\/?a$/i.test(raw) || /^unknown$/i.test(raw) || raw.toLowerCase() === 'nan') {
+    return 'Unknown';
+  }
+  return raw;
+}
+
+function safeAmount(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function truncateLabel(s, n) {
+  const t = String(s || '');
+  return t.length > n ? t.slice(0, n - 1) + '…' : t;
+}
+
+function setChartEmpty(wrapId, message) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  wrap.innerHTML = `<div class="chart-empty">${esc(message || 'No items')}</div>`;
+}
+
+function ensureChartCanvas(wrapId, canvasId) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return null;
+  let canvas = document.getElementById(canvasId);
+  if (!canvas) {
+    wrap.innerHTML = `<canvas id="${canvasId}"></canvas>`;
+    canvas = document.getElementById(canvasId);
+  }
+  return canvas;
+}
+
+const FLAG_TYPE_LABELS = {
+  INFLATED_AMOUNT: 'Inflated',
+  MISSING_LOCATION: 'No Location',
+  VAGUE_LOCATION: 'Vague',
+  VAGUE_HIGH_VALUE: 'Vague High Value',
+  GHOST_PROJECT: 'Ghost',
+  MANDATE_MISMATCH: 'Mandate Mismatch',
+  DUPLICATE_CLUSTER: 'Duplicates',
+  COMPOSITE_DUPLICATE: 'Composite Duplicate',
+  BUDGET_SPLITTING: 'Budget Splitting',
+  CONTEXT_MISMATCH: 'Context Mismatch',
+  OVERHEAD_DOMINANCE: 'Overhead Dominance',
+  INFLATED_PROJECTION: 'Inflated Projection',
+  PHANTOM_SPENDING: 'Phantom Spending',
+  ZERO_ROLLOVER: 'Zero Rollover',
+};
+
+function chartMoneyTicks() {
+  return {
+    callback: (v) => fmtNGN(v),
+    font: { size: 10, family: 'Inter' },
+    color: '#4A5A72',
+  };
+}
+
 function renderCharts() {
-  if (!scanData || !allResults.length) return;
   destroyCharts();
 
+  const statsEl = document.getElementById('visualsStats');
+  if (!scanData) {
+    if (statsEl) {
+      document.getElementById('statUnlocatedNum').textContent = '—';
+      document.getElementById('statFlaggedSpend').textContent = '—';
+      document.getElementById('statFlaggedPct').textContent = '—';
+    }
+    setChartEmpty('chartMdaWrap', 'Run a scan to see charts');
+    setChartEmpty('chartFlagsWrap', 'Run a scan to see charts');
+    setChartEmpty('chartRiskWrap', 'Run a scan to see charts');
+    setChartEmpty('chartCategoryWrap', 'Run a scan to see charts');
+    return;
+  }
+
+  if (!allResults.length) {
+    document.getElementById('statUnlocatedNum').textContent = '0';
+    document.getElementById('statFlaggedSpend').textContent = '₦0';
+    document.getElementById('statFlaggedPct').textContent = '0%';
+    setChartEmpty('chartMdaWrap', 'No items');
+    setChartEmpty('chartFlagsWrap', 'No items');
+    setChartEmpty('chartRiskWrap', 'No items');
+    setChartEmpty('chartCategoryWrap', 'No items');
+    return;
+  }
+
+  // ── Stat band ────────────────────────────────────────────────────────────
+  const unlocated = allResults.filter(r =>
+    !(r.location && String(r.location).trim()) ||
+    (r.flags || []).some(f => f.flag_type === 'MISSING_LOCATION' || f.flag_type === 'VAGUE_LOCATION')
+  ).length;
+  const flaggedSpend = allResults.reduce((s, r) => s + safeAmount(r.amount), 0);
+  const totalBudget = safeAmount(scanData.total_amount);
+  const flaggedPct = totalBudget > 0 ? (100 * flaggedSpend / totalBudget) : (scanData.flag_rate ? 100 * scanData.flag_rate : 0);
+
+  document.getElementById('statUnlocatedNum').textContent = unlocated.toLocaleString();
+  document.getElementById('statFlaggedSpend').textContent = fmtNGN(flaggedSpend);
+  document.getElementById('statFlaggedSpendSub').textContent =
+    `${(scanData.flagged_items || allResults.length).toLocaleString()} flagged of ${(scanData.total_items || 0).toLocaleString()} scanned`;
+  document.getElementById('statFlaggedPct').textContent = (flaggedPct || 0).toFixed(1) + '%';
+  document.getElementById('statFlaggedPctSub').textContent =
+    totalBudget > 0 ? `of ${fmtNGN(totalBudget)} total budget` : 'share of scanned amount';
+
+  // ── 1. Top 15 MDA by flagged spend (stacked by risk) ─────────────────────
+  const mdaRisk = {};
+  let unknownSpend = 0;
+  let knownSpend = 0;
+  allResults.forEach(r => {
+    const m = resultMdaName(r);
+    const amt = safeAmount(r.amount);
+    if (!mdaRisk[m]) mdaRisk[m] = { HIGH: 0, MEDIUM: 0, LOW: 0, total: 0 };
+    const lvl = (r.risk_level || 'LOW').toUpperCase();
+    const bucket = (lvl === 'HIGH' || lvl === 'MEDIUM') ? lvl : 'LOW';
+    mdaRisk[m][bucket] += amt;
+    mdaRisk[m].total += amt;
+    if (m === 'Unknown') unknownSpend += amt;
+    else knownSpend += amt;
+  });
+  const topMda = Object.entries(mdaRisk).sort((a, b) => b[1].total - a[1].total).slice(0, 15);
+  const unknownPct = flaggedSpend > 0 ? (100 * unknownSpend / flaggedSpend) : 0;
+  const mdaSub = document.getElementById('mdaChartSub');
+  if (mdaSub) {
+    mdaSub.textContent = unknownSpend > 0
+      ? `Segmented by risk. Unknown MDA: ${fmtNGN(unknownSpend)} (${unknownPct.toFixed(1)}% of flagged spend) — data-quality gap.`
+      : 'Segmented by risk level. All flagged spend attributed to a parent MDA.';
+  }
+
+  if (!topMda.length || topMda.every(([, v]) => v.total <= 0)) {
+    setChartEmpty('chartMdaWrap', 'No items');
+  } else {
+    const canvas = ensureChartCanvas('chartMdaWrap', 'chartMda');
+    chartInstances.mda = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: topMda.map(([name]) => truncateLabel(name, 36)),
+        datasets: [
+          { label: 'High risk', data: topMda.map(([, v]) => v.HIGH), backgroundColor: '#E63946', stack: 'risk' },
+          { label: 'Medium risk', data: topMda.map(([, v]) => v.MEDIUM), backgroundColor: '#D97706', stack: 'risk' },
+          { label: 'Low risk', data: topMda.map(([, v]) => v.LOW), backgroundColor: '#0B2545', stack: 'risk' },
+        ],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11, family: 'Inter' } } },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const i = items[0] && items[0].dataIndex;
+                return i != null ? topMda[i][0] : '';
+              },
+              label: (ctx) => `${ctx.dataset.label}: ${fmtNGN(ctx.parsed.x)}`,
+              footer: (items) => {
+                const i = items[0] && items[0].dataIndex;
+                if (i == null) return '';
+                return 'Total: ' + fmtNGN(topMda[i][1].total);
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            stacked: true,
+            title: { display: true, text: 'Flagged spend (₦)', font: { size: 11, family: 'Inter' } },
+            ticks: chartMoneyTicks(),
+            grid: { color: 'rgba(11,37,69,0.06)' },
+          },
+          y: {
+            stacked: true,
+            title: { display: true, text: 'MDA', font: { size: 11, family: 'Inter' } },
+            ticks: { font: { size: 10, family: 'Inter' }, color: '#0B2545' },
+            grid: { display: false },
+          },
+        },
+      },
+    });
+  }
+
+  // ── 2. Flags by type ─────────────────────────────────────────────────────
+  const flagCounts = {};
+  allResults.forEach(r => {
+    (r.flags || []).forEach(f => {
+      const ft = f.flag_type || 'OTHER';
+      flagCounts[ft] = (flagCounts[ft] || 0) + 1;
+    });
+  });
+  const flagRows = Object.entries(flagCounts).sort((a, b) => b[1] - a[1]);
+  if (!flagRows.length) {
+    setChartEmpty('chartFlagsWrap', 'No items');
+  } else {
+    const canvas = ensureChartCanvas('chartFlagsWrap', 'chartFlags');
+    chartInstances.flags = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: flagRows.map(([ft]) => FLAG_TYPE_LABELS[ft] || ft.replace(/_/g, ' ')),
+        datasets: [{
+          label: 'Flag count',
+          data: flagRows.map(([, n]) => n),
+          backgroundColor: '#13315C',
+          borderRadius: 4,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => `Count: ${ctx.parsed.x}` } },
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Count', font: { size: 11, family: 'Inter' } },
+            ticks: { precision: 0, font: { size: 10, family: 'Inter' }, color: '#4A5A72' },
+            grid: { color: 'rgba(11,37,69,0.06)' },
+          },
+          y: {
+            title: { display: true, text: 'Flag type', font: { size: 11, family: 'Inter' } },
+            ticks: { font: { size: 10, family: 'Inter' }, color: '#0B2545' },
+            grid: { display: false },
+          },
+        },
+      },
+    });
+  }
+
+  // ── 3. Flagged spend by project category ─────────────────────────────────
+  const catSpend = {};
+  allResults.forEach(r => {
+    const cat = (r.project_category || '').toString().trim() || 'unclassified';
+    catSpend[cat] = (catSpend[cat] || 0) + safeAmount(r.amount);
+  });
+  const catRows = Object.entries(catSpend).sort((a, b) => b[1] - a[1]).slice(0, 15);
+  if (!catRows.length || catRows.every(([, v]) => v <= 0)) {
+    setChartEmpty('chartCategoryWrap', 'No items');
+  } else {
+    const canvas = ensureChartCanvas('chartCategoryWrap', 'chartCategory');
+    chartInstances.category = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: catRows.map(([c]) => truncateLabel(c.replace(/_/g, ' '), 28)),
+        datasets: [{
+          label: 'Flagged spend',
+          data: catRows.map(([, v]) => v),
+          backgroundColor: '#1E4272',
+          borderRadius: 4,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const i = items[0] && items[0].dataIndex;
+                return i != null ? catRows[i][0] : '';
+              },
+              label: (ctx) => fmtNGN(ctx.parsed.x),
+            },
+          },
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Flagged spend (₦)', font: { size: 11, family: 'Inter' } },
+            ticks: chartMoneyTicks(),
+            grid: { color: 'rgba(11,37,69,0.06)' },
+          },
+          y: {
+            title: { display: true, text: 'Project category', font: { size: 11, family: 'Inter' } },
+            ticks: { font: { size: 10, family: 'Inter' }, color: '#0B2545' },
+            grid: { display: false },
+          },
+        },
+      },
+    });
+  }
+
+  // ── 4. Risk distribution donut with counts/% ─────────────────────────────
   const high = allResults.filter(r => r.risk_level === 'HIGH').length;
   const med = allResults.filter(r => r.risk_level === 'MEDIUM').length;
   const low = allResults.filter(r => r.risk_level === 'LOW').length;
+  const riskTotal = high + med + low;
+  if (riskTotal === 0) {
+    setChartEmpty('chartRiskWrap', 'No items');
+  } else {
+    const canvas = ensureChartCanvas('chartRiskWrap', 'chartRisk');
+    const riskData = [
+      { key: 'High', n: high, color: '#E63946' },
+      { key: 'Medium', n: med, color: '#D97706' },
+      { key: 'Low', n: low, color: '#0B2545' },
+    ].filter(d => d.n > 0);
+    chartInstances.risk = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: riskData.map(d => {
+          const pct = ((100 * d.n) / riskTotal).toFixed(1);
+          return `${d.key}: ${d.n.toLocaleString()} (${pct}%)`;
+        }),
+        datasets: [{
+          data: riskData.map(d => d.n),
+          backgroundColor: riskData.map(d => d.color),
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '58%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { boxWidth: 12, font: { size: 11, family: 'Inter' }, padding: 14 },
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const n = ctx.parsed || 0;
+                const pct = riskTotal ? ((100 * n) / riskTotal).toFixed(1) : '0';
+                return ` ${n.toLocaleString()} items (${pct}%)`;
+              },
+            },
+          },
+        },
+      },
+      plugins: [{
+        id: 'riskCenterText',
+        afterDraw(chart) {
+          const { ctx, chartArea } = chart;
+          if (!chartArea) return;
+          const cx = (chartArea.left + chartArea.right) / 2;
+          const cy = (chartArea.top + chartArea.bottom) / 2;
+          ctx.save();
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#0B2545';
+          ctx.font = '700 22px Inter';
+          ctx.fillText(String(riskTotal.toLocaleString()), cx, cy - 8);
+          ctx.fillStyle = '#4A5A72';
+          ctx.font = '500 11px Inter';
+          ctx.fillText('flagged items', cx, cy + 12);
+          ctx.restore();
+        },
+      }],
+    });
+  }
 
-  chartInstances.risk = new Chart(document.getElementById('chartRisk'), {
-    type: 'doughnut',
-    data: {
-      labels: ['High', 'Medium', 'Low'],
-      datasets: [{ data: [high, med, low], backgroundColor: ['#E63946', '#D97706', '#0B2545'], borderWidth: 0 }]
-    },
-    options: { plugins: { legend: { position: 'bottom' } }, cutout: '60%' }
-  });
-
-  const mdaMap = {};
-  allResults.forEach(r => {
-    const m = r.mda_name || r.ministry || 'Unknown';
-    mdaMap[m] = (mdaMap[m] || 0) + (Number(r.amount) || 0);
-  });
-  const topMda = Object.entries(mdaMap).sort((a,b) => b[1]-a[1]).slice(0,15);
-  chartInstances.mda = new Chart(document.getElementById('chartMda'), {
-    type: 'bar',
-    data: {
-      labels: topMda.map(m => m[0].length > 28 ? m[0].slice(0,28)+'…' : m[0]),
-      datasets: [{ label: 'Flagged spend', data: topMda.map(m => m[1]), backgroundColor: '#13315C' }]
-    },
-    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { callback: v => fmtNGN(v) } } } }
-  });
-
-  const unlocated = allResults.filter(r =>
-    !(r.location && String(r.location).trim()) ||
-    (r.flags||[]).some(f => f.flag_type === 'MISSING_LOCATION' || f.flag_type === 'VAGUE_LOCATION')
-  ).length;
-  document.getElementById('unlocatedNum').textContent = unlocated;
-
+  // ── Multi-year (optional) ────────────────────────────────────────────────
   const yearWrap = document.getElementById('yearChartWrap');
   if (scanData.multi_year && scanData.per_year && scanData.per_year.length > 1) {
     yearWrap.style.display = 'block';
     const yearSpend = {};
     allResults.forEach(r => {
       const y = r.budget_year || 'Unknown';
-      yearSpend[y] = (yearSpend[y] || 0) + (Number(r.amount) || 0);
+      yearSpend[y] = (yearSpend[y] || 0) + safeAmount(r.amount);
     });
     const years = Object.keys(yearSpend).sort();
-    chartInstances.year = new Chart(document.getElementById('chartYear'), {
-      type: 'bar',
-      data: {
-        labels: years,
-        datasets: [{ label: 'Flagged spend by year', data: years.map(y => yearSpend[y]), backgroundColor: '#E63946' }]
-      },
-      options: { plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => fmtNGN(v) } } } }
-    });
+    if (!years.length) {
+      setChartEmpty('chartYearWrapInner', 'No items');
+    } else {
+      const canvas = ensureChartCanvas('chartYearWrapInner', 'chartYear');
+      chartInstances.year = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: years,
+          datasets: [{ label: 'Flagged spend', data: years.map(y => yearSpend[y]), backgroundColor: '#E63946', borderRadius: 4 }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => fmtNGN(ctx.parsed.y) } },
+          },
+          scales: {
+            y: {
+              title: { display: true, text: 'Flagged spend (₦)', font: { size: 11, family: 'Inter' } },
+              ticks: chartMoneyTicks(),
+            },
+            x: {
+              title: { display: true, text: 'Budget year', font: { size: 11, family: 'Inter' } },
+            },
+          },
+        },
+      });
+    }
   } else {
     yearWrap.style.display = 'none';
   }
