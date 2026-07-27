@@ -75,6 +75,7 @@ EMPTY_FLAG_SUMMARY = {
     "phantom_spending":    0,
     "vague_high_value":    0,
     "zero_rollover":       0,
+    "blank_approved_amount": 0,
 }
 
 _FLAG_MAP = {
@@ -92,6 +93,7 @@ _FLAG_MAP = {
     "PHANTOM_SPENDING":     "phantom_spending",
     "VAGUE_HIGH_VALUE_SPEND": "vague_high_value",
     "ZERO_ROLLOVER":        "zero_rollover",
+    "BLANK_APPROVED_AMOUNT": "blank_approved_amount",
 }
 
 
@@ -155,51 +157,25 @@ def process_single(contents: bytes, filename: str, budget_year: str) -> Dict[str
 
     budget_format = df.attrs.get("budget_format") or "federal_fgn"
     parse_meta = df.attrs.get("parse_meta") or {}
+    jurisdiction = (
+        "state_niger" if budget_format == FORMAT_STATE_NIGER else "federal"
+    )
 
-    # Step 1 (state support): parse-only — do not run federal flag engines yet.
-    if budget_format == FORMAT_STATE_NIGER:
-        items = df.to_dict("records")
-        total_amount = safe_float(df["amount"].sum()) if "amount" in df.columns else 0.0
-        return {
-            "budget_year": budget_year,
-            "filename": filename,
-            "budget_format": budget_format,
-            "parse_only": True,
-            "parse_meta": parse_meta,
-            "total_items": len(df),
-            "flagged_items": 0,
-            "high_risk": 0,
-            "medium_risk": 0,
-            "low_risk": 0,
-            "at_risk_amount": 0.0,
-            "total_amount": total_amount,
-            "flag_summary": dict(EMPTY_FLAG_SUMMARY),
-            "results": [],
-            "shortlist": [],
-            "items": items,
-            "unclassified_count": 0,
-            "flag_rate": 0.0,
-            "narratives": [],
-            "visuals": {},
-            "multi_year": False,
-            "ghost_enabled": False,
-            "message": (
-                "Niger State budget parsed successfully. Flag detection for state "
-                "budgets is not enabled yet — verify parse quality first."
-            ),
-        }
-
-    flagged_rows = run_all_flags(df, budget_year=budget_year)
+    flagged_rows = run_all_flags(df, budget_year=budget_year, jurisdiction=jurisdiction)
     scored = score_items(flagged_rows) if flagged_rows else []
     out = summarize_scan(df, scored)
     out["budget_year"] = budget_year
     out["filename"] = filename
     out["budget_format"] = budget_format
     out["parse_meta"] = parse_meta
+    out["jurisdiction"] = jurisdiction
+    out["parse_only"] = False
     out["narratives"] = generate_narratives(scored)
     out["visuals"] = visuals_payload(scored)
     out["multi_year"] = False
     out["ghost_enabled"] = False
+    # Null-2026 rows remain in total_items; blank-approved flag keeps them visible in results
+    out["null_approved_amount_count"] = int(df["amount"].isna().sum()) if "amount" in df.columns else 0
     return out
 
 

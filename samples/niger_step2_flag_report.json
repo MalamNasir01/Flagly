@@ -1,0 +1,1527 @@
+{
+  "total_items": 1014,
+  "location_distribution": [
+    {
+      "location": "CHANCHAGA",
+      "count": 287
+    },
+    {
+      "location": "State Wide",
+      "count": 287
+    },
+    {
+      "location": "KONTAGORA",
+      "count": 35
+    },
+    {
+      "location": "BIDA",
+      "count": 34
+    },
+    {
+      "location": "MOKOWA",
+      "count": 28
+    },
+    {
+      "location": "GBAKO",
+      "count": 24
+    },
+    {
+      "location": "RAFI",
+      "count": 23
+    },
+    {
+      "location": "BORGU",
+      "count": 21
+    },
+    {
+      "location": "SULEJA",
+      "count": 20
+    },
+    {
+      "location": "BOSSO",
+      "count": 20
+    },
+    {
+      "location": "LAVUN",
+      "count": 19
+    },
+    {
+      "location": "AGAIE",
+      "count": 18
+    },
+    {
+      "location": "SHIRORO",
+      "count": 18
+    },
+    {
+      "location": "MARIGA",
+      "count": 18
+    },
+    {
+      "location": "PAIKORO",
+      "count": 17
+    },
+    {
+      "location": "RURAL WATER AND SANITATION",
+      "count": 17
+    },
+    {
+      "location": "MAGAMA",
+      "count": 15
+    },
+    {
+      "location": "WUSHISHI",
+      "count": 15
+    },
+    {
+      "location": "LAPAI",
+      "count": 13
+    },
+    {
+      "location": "KATCHA",
+      "count": 13
+    },
+    {
+      "location": "EDATI",
+      "count": 12
+    },
+    {
+      "location": "MUNYA",
+      "count": 12
+    },
+    {
+      "location": "RIJAU",
+      "count": 12
+    },
+    {
+      "location": "TAFA",
+      "count": 11
+    },
+    {
+      "location": "MASHEGU",
+      "count": 9
+    },
+    {
+      "location": "AGWARA",
+      "count": 9
+    },
+    {
+      "location": "GURARA",
+      "count": 6
+    },
+    {
+      "location": "OUTSIDE STATE",
+      "count": 1
+    }
+  ],
+  "chanchaga_pct": 28.3,
+  "niger_mdas": [
+    {
+      "name": "Abdulkadir Kure University Minna",
+      "mda_code": "056600700100",
+      "scope": [
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "vocational_training",
+        "educational_materials",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads",
+        "bridges",
+        "military_equipment",
+        "housing"
+      ]
+    },
+    {
+      "name": "Asset Management Agency",
+      "mda_code": "022000500100",
+      "scope": [
+        "financial_regulation",
+        "taxation",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Book Development Agency",
+      "mda_code": "051705800100",
+      "scope": [
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "vocational_training",
+        "educational_materials",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads",
+        "bridges",
+        "military_equipment",
+        "housing"
+      ]
+    },
+    {
+      "name": "Bureau of Religious Affairs",
+      "mda_code": "016101600100",
+      "scope": [
+        "social_welfare",
+        "cultural_facilities",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "road_maintenance",
+        "bridges",
+        "health_facilities"
+      ]
+    },
+    {
+      "name": "Bureau of Statistics",
+      "mda_code": "023800600100",
+      "scope": [
+        "population_data",
+        "research_development",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "roads"
+      ]
+    },
+    {
+      "name": "Cabinet Office",
+      "mda_code": "016100700100",
+      "scope": [
+        "recurrent_admin",
+        "ict_infrastructure",
+        "housing"
+      ],
+      "excluded": [
+        "agriculture_inputs"
+      ]
+    },
+    {
+      "name": "Child Right Agency",
+      "mda_code": "051400400100",
+      "scope": [
+        "gender_programs",
+        "child_welfare",
+        "social_welfare",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "road_maintenance",
+        "bridges",
+        "primary_schools",
+        "secondary_schools"
+      ]
+    },
+    {
+      "name": "Civil Service Commission",
+      "mda_code": "014700100100",
+      "scope": [
+        "recurrent_admin",
+        "ict_infrastructure",
+        "housing"
+      ],
+      "excluded": [
+        "agriculture_inputs"
+      ]
+    },
+    {
+      "name": "College of Education Minna",
+      "mda_code": "056600500100",
+      "scope": [
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "vocational_training",
+        "educational_materials",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads",
+        "bridges",
+        "military_equipment",
+        "housing"
+      ]
+    },
+    {
+      "name": "College of Midwifery Minna",
+      "mda_code": "056910400300",
+      "scope": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "road_maintenance",
+        "bridges",
+        "housing",
+        "markets",
+        "sports_facilities",
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "roads",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "College of Nursing Sciences Bida",
+      "mda_code": "056910400200",
+      "scope": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "road_maintenance",
+        "bridges",
+        "housing",
+        "markets",
+        "sports_facilities",
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "roads",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "Debt Management Bureau (DMB)",
+      "mda_code": "022000200100",
+      "scope": [
+        "financial_regulation",
+        "taxation",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Fiscal Responsibility Commission",
+      "mda_code": "025000100100",
+      "scope": [
+        "financial_regulation",
+        "taxation",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Government Printing Press",
+      "mda_code": "012300400100",
+      "scope": [
+        "broadcasting",
+        "ict_infrastructure",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads"
+      ]
+    },
+    {
+      "name": "Head of Civil Service",
+      "mda_code": "012500100100",
+      "scope": [
+        "recurrent_admin",
+        "ict_infrastructure",
+        "housing"
+      ],
+      "excluded": [
+        "agriculture_inputs"
+      ]
+    },
+    {
+      "name": "High Court Headquarters",
+      "mda_code": "031800200100",
+      "scope": [
+        "justice_administration",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Housing Corporation",
+      "mda_code": "025300200100",
+      "scope": [
+        "housing",
+        "urban_infrastructure",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "IBB Specialist Hospital",
+      "mda_code": "056900200100",
+      "scope": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "road_maintenance",
+        "bridges",
+        "housing",
+        "markets",
+        "sports_facilities",
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "roads",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "IBB University",
+      "mda_code": "056600600100",
+      "scope": [
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "vocational_training",
+        "educational_materials",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads",
+        "bridges",
+        "military_equipment",
+        "housing"
+      ]
+    },
+    {
+      "name": "Judicial Service Commission",
+      "mda_code": "031800100100",
+      "scope": [
+        "justice_administration",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Law Reform Commission",
+      "mda_code": "032600200100",
+      "scope": [
+        "justice_administration",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Media Corporation (Radio Division)",
+      "mda_code": "012300300100",
+      "scope": [
+        "broadcasting",
+        "ict_infrastructure",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads"
+      ]
+    },
+    {
+      "name": "Media Corporation TV",
+      "mda_code": "012300200100",
+      "scope": [
+        "broadcasting",
+        "ict_infrastructure",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads"
+      ]
+    },
+    {
+      "name": "Mid-land Petro Gas Ltd",
+      "mda_code": "023300300100",
+      "scope": [
+        "solid_minerals",
+        "oil_gas",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools"
+      ]
+    },
+    {
+      "name": "Ministry for Transport",
+      "mda_code": "022900100100",
+      "scope": [
+        "roads",
+        "road_maintenance",
+        "water_transport",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools"
+      ]
+    },
+    {
+      "name": "Ministry of Agriculture",
+      "mda_code": "021500100100",
+      "scope": [
+        "agriculture_inputs",
+        "irrigation",
+        "livestock",
+        "fisheries",
+        "food_storage",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads",
+        "housing"
+      ]
+    },
+    {
+      "name": "Ministry of Environment",
+      "mda_code": "053500100100",
+      "scope": [
+        "environmental_protection",
+        "climate_action",
+        "forestry",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "roads"
+      ]
+    },
+    {
+      "name": "Ministry of Finance",
+      "mda_code": "022000100100",
+      "scope": [
+        "financial_regulation",
+        "taxation",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Ministry of Gender Affairs",
+      "mda_code": "051400100100",
+      "scope": [
+        "gender_programs",
+        "child_welfare",
+        "social_welfare",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "road_maintenance",
+        "bridges",
+        "primary_schools",
+        "secondary_schools"
+      ]
+    },
+    {
+      "name": "Ministry of Health",
+      "mda_code": "056900100100",
+      "scope": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "road_maintenance",
+        "bridges",
+        "housing",
+        "markets",
+        "sports_facilities",
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "roads",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "Ministry of Homeland Security",
+      "mda_code": "012400100100",
+      "scope": [
+        "disaster_response",
+        "policing",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "primary_schools",
+        "secondary_schools"
+      ]
+    },
+    {
+      "name": "Ministry of Information",
+      "mda_code": "012300100100",
+      "scope": [
+        "broadcasting",
+        "ict_infrastructure",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads"
+      ]
+    },
+    {
+      "name": "Ministry of Justice",
+      "mda_code": "032600100100",
+      "scope": [
+        "justice_administration",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Ministry of Lands and Survey",
+      "mda_code": "026000100100",
+      "scope": [
+        "urban_infrastructure",
+        "housing",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools"
+      ]
+    },
+    {
+      "name": "Ministry of Primary Health Care",
+      "mda_code": "052100100100",
+      "scope": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "road_maintenance",
+        "bridges",
+        "housing",
+        "markets",
+        "sports_facilities",
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "roads",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "Ministry of Rural Development",
+      "mda_code": "027000100100",
+      "scope": [
+        "urban_infrastructure",
+        "water_supply",
+        "roads",
+        "social_welfare",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities"
+      ]
+    },
+    {
+      "name": "Ministry of Tertiary Education",
+      "mda_code": "056600100100",
+      "scope": [
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "vocational_training",
+        "educational_materials",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads",
+        "bridges",
+        "military_equipment",
+        "housing"
+      ]
+    },
+    {
+      "name": "Ministry of Tourism and Culture",
+      "mda_code": "023600100100",
+      "scope": [
+        "tourism_facilities",
+        "cultural_facilities",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads"
+      ]
+    },
+    {
+      "name": "Ministry of Water Resources",
+      "mda_code": "025200100100",
+      "scope": [
+        "water_supply",
+        "sanitation",
+        "dams",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "primary_schools",
+        "secondary_schools",
+        "roads",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "Ministry of Works",
+      "mda_code": "023400100100",
+      "scope": [
+        "roads",
+        "road_maintenance",
+        "bridges",
+        "urban_infrastructure",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "vocational_training",
+        "educational_materials",
+        "agriculture_inputs",
+        "irrigation",
+        "livestock",
+        "fisheries",
+        "food_storage",
+        "military_equipment",
+        "social_welfare"
+      ]
+    },
+    {
+      "name": "Multi Door Courts",
+      "mda_code": "031800800100",
+      "scope": [
+        "justice_administration",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Niger State College of Agriculture",
+      "mda_code": "021500200100",
+      "scope": [
+        "agriculture_inputs",
+        "irrigation",
+        "livestock",
+        "fisheries",
+        "food_storage",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads",
+        "housing"
+      ]
+    },
+    {
+      "name": "Niger State Electrification Board",
+      "mda_code": "023100200100",
+      "scope": [
+        "electricity_generation",
+        "electricity_distribution",
+        "renewable_energy",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Niger State Fire Service",
+      "mda_code": "016100200100",
+      "scope": [
+        "fire_service",
+        "disaster_response",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Niger State Industrial Park Agency",
+      "mda_code": "022200400100",
+      "scope": [
+        "industrial_parks",
+        "trade_facilitation",
+        "markets",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "primary_schools",
+        "secondary_schools"
+      ]
+    },
+    {
+      "name": "Niger State Innovation Institute",
+      "mda_code": "056600200100",
+      "scope": [
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "Niger State Library Board",
+      "mda_code": "051700400100",
+      "scope": [
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "vocational_training",
+        "educational_materials",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads",
+        "bridges",
+        "military_equipment",
+        "housing"
+      ]
+    },
+    {
+      "name": "Niger State Liquor Board",
+      "mda_code": "016101700100",
+      "scope": [
+        "social_welfare",
+        "cultural_facilities",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "road_maintenance",
+        "bridges",
+        "health_facilities"
+      ]
+    },
+    {
+      "name": "Niger State Pension Board",
+      "mda_code": "012500600100",
+      "scope": [
+        "financial_regulation",
+        "taxation",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Niger State Planning Commission",
+      "mda_code": "023800100100",
+      "scope": [
+        "population_data",
+        "research_development",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "roads"
+      ]
+    },
+    {
+      "name": "Niger State Polytechnic",
+      "mda_code": "056600400100",
+      "scope": [
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "vocational_training",
+        "educational_materials",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads",
+        "bridges",
+        "military_equipment",
+        "housing"
+      ]
+    },
+    {
+      "name": "Niger State Scholarship Board",
+      "mda_code": "056600800100",
+      "scope": [
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "vocational_training",
+        "educational_materials",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads",
+        "bridges",
+        "military_equipment",
+        "housing"
+      ]
+    },
+    {
+      "name": "Niger State Sport Commission",
+      "mda_code": "053900200100",
+      "scope": [
+        "youth_programs",
+        "sports_facilities",
+        "social_welfare",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "roads"
+      ]
+    },
+    {
+      "name": "Niger State Tourism Corporation",
+      "mda_code": "023600200100",
+      "scope": [
+        "tourism_facilities",
+        "cultural_facilities",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads"
+      ]
+    },
+    {
+      "name": "Niger State Transport Authority",
+      "mda_code": "022900600100",
+      "scope": [
+        "roads",
+        "road_maintenance",
+        "water_transport",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools"
+      ]
+    },
+    {
+      "name": "Office of the Auditor General State",
+      "mda_code": "014000100100",
+      "scope": [
+        "financial_regulation",
+        "taxation",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Office of the Deputy Governor",
+      "mda_code": "011100100200",
+      "scope": [
+        "recurrent_admin",
+        "ict_infrastructure",
+        "housing"
+      ],
+      "excluded": [
+        "agriculture_inputs"
+      ]
+    },
+    {
+      "name": "Office of the Executive Governor",
+      "mda_code": "011100100100",
+      "scope": [
+        "recurrent_admin",
+        "ict_infrastructure",
+        "housing"
+      ],
+      "excluded": [
+        "agriculture_inputs"
+      ]
+    },
+    {
+      "name": "Office of The Surveyor General",
+      "mda_code": "026000400100",
+      "scope": [
+        "urban_infrastructure",
+        "housing",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools"
+      ]
+    },
+    {
+      "name": "Pilgrims Welfare Commission",
+      "mda_code": "016101500100",
+      "scope": [
+        "social_welfare",
+        "cultural_facilities",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "road_maintenance",
+        "bridges",
+        "health_facilities"
+      ]
+    },
+    {
+      "name": "Public Procurement Board",
+      "mda_code": "011101000100",
+      "scope": [
+        "financial_regulation",
+        "taxation",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "RURAL WATER AND SANITATION",
+      "mda_code": "025210400100",
+      "scope": [
+        "water_supply",
+        "sanitation",
+        "dams",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "primary_schools",
+        "secondary_schools",
+        "roads",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "School of Health Technology Minna",
+      "mda_code": "056910600100",
+      "scope": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "roads",
+        "road_maintenance",
+        "bridges",
+        "housing",
+        "markets",
+        "sports_facilities",
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "roads",
+        "military_equipment"
+      ]
+    },
+    {
+      "name": "Sharia Court of Appeal",
+      "mda_code": "031800300100",
+      "scope": [
+        "justice_administration",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "State Agency for Mass Education",
+      "mda_code": "051700500100",
+      "scope": [
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "vocational_training",
+        "educational_materials",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads",
+        "bridges",
+        "military_equipment",
+        "housing"
+      ]
+    },
+    {
+      "name": "State House of Assembly",
+      "mda_code": "011200300100",
+      "scope": [
+        "recurrent_admin",
+        "ict_infrastructure",
+        "housing"
+      ],
+      "excluded": [
+        "agriculture_inputs"
+      ]
+    },
+    {
+      "name": "State Universal Education Board-SUBEB",
+      "mda_code": "051700300100",
+      "scope": [
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "vocational_training",
+        "educational_materials",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "roads",
+        "bridges",
+        "military_equipment",
+        "housing"
+      ]
+    },
+    {
+      "name": "Upper Sharia Courts",
+      "mda_code": "031800400100",
+      "scope": [
+        "justice_administration",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Urban Development Board",
+      "mda_code": "026000300100",
+      "scope": [
+        "housing",
+        "urban_infrastructure",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools",
+        "roads"
+      ]
+    },
+    {
+      "name": "Zuma Mineral Development Ltd",
+      "mda_code": "023300200100",
+      "scope": [
+        "solid_minerals",
+        "oil_gas",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "primary_schools",
+        "secondary_schools"
+      ]
+    }
+  ],
+  "flags_enabled": [
+    "INFLATED_AMOUNT (state benchmarks + State Wide exempt)",
+    "CONTEXT_MISMATCH",
+    "MISSING_LOCATION",
+    "GHOST_PROJECT",
+    "VAGUE_LOCATION",
+    "MANDATE_MISMATCH (mda_mandates_states.json)",
+    "BUDGET_SPLITTING",
+    "COMPOSITE_DUPLICATE",
+    "INFLATED_PROJECTION",
+    "PHANTOM_SPENDING",
+    "VAGUE_HIGH_VALUE_SPEND",
+    "ZERO_ROLLOVER",
+    "BLANK_APPROVED_AMOUNT (new)"
+  ],
+  "flags_disabled": [
+    "OVERHEAD_DOMINANCE \u2014 no overhead/capital MDA-level fields on state rows",
+    "DUPLICATE_CLUSTER (fuzzy) \u2014 Format B uses COMPOSITE_DUPLICATE instead",
+    "GHOST multi-year \u2014 multi-year state upload still blocked in API"
+  ],
+  "null_handling": {
+    "null_2026_count": 301,
+    "approach": "BLANK_APPROVED_AMOUNT flag; MEDIUM if prior-year figures exist, else LOW; rows stay in total_items and appear in flagged results",
+    "blank_flags_in_results": 301
+  },
+  "flag_summary": {
+    "INFLATED_AMOUNT": 43,
+    "COMPOSITE_DUPLICATE": 134,
+    "MANDATE_MISMATCH": 287,
+    "CONTEXT_MISMATCH": 7,
+    "VAGUE_HIGH_VALUE_SPEND": 3,
+    "PHANTOM_SPENDING": 3,
+    "BUDGET_SPLITTING": 4,
+    "BLANK_APPROVED_AMOUNT": 301,
+    "VAGUE_LOCATION": 2
+  },
+  "flagged_items": 641,
+  "flag_rate_pct": 63.21,
+  "top10": [
+    {
+      "rank": 1,
+      "score": 97,
+      "amount": 8000000000.0,
+      "mda": "Ministry of Finance",
+      "location": "CHANCHAGA",
+      "flags": [
+        "INFLATED_AMOUNT:HIGH",
+        "COMPOSITE_DUPLICATE:HIGH"
+      ],
+      "description": "Procurement of 42No. Changan Mikano 2019 Model and 40No. Maxus Mikano vehicles"
+    },
+    {
+      "rank": 2,
+      "score": 97,
+      "amount": 7343598443.0,
+      "mda": "Ministry of Agriculture",
+      "location": "AGWARA",
+      "flags": [
+        "INFLATED_AMOUNT:HIGH",
+        "MANDATE_MISMATCH:HIGH"
+      ],
+      "description": "Construction of 10km Rural Roads and Markets)World Bank) Agwara"
+    },
+    {
+      "rank": 3,
+      "score": 96,
+      "amount": 5400000000.0,
+      "mda": "Ministry of Agriculture",
+      "location": "KATCHA",
+      "flags": [
+        "INFLATED_AMOUNT:HIGH",
+        "MANDATE_MISMATCH:HIGH"
+      ],
+      "description": "Development of Software for MDAs Intergovernmental Affairs Construction of 10km Rural Roads and Markets)World Bank at Katcha"
+    },
+    {
+      "rank": 4,
+      "score": 96,
+      "amount": 5400000000.0,
+      "mda": "Ministry of Agriculture",
+      "location": "SHIRORO",
+      "flags": [
+        "INFLATED_AMOUNT:HIGH",
+        "MANDATE_MISMATCH:HIGH"
+      ],
+      "description": "Construction of 10km Rural Roads and Markets)World Bank at shiroro"
+    },
+    {
+      "rank": 5,
+      "score": 94,
+      "amount": 1600000000.0,
+      "mda": "Ministry of Finance",
+      "location": "CHANCHAGA",
+      "flags": [
+        "INFLATED_AMOUNT:HIGH",
+        "MANDATE_MISMATCH:MEDIUM",
+        "COMPOSITE_DUPLICATE:HIGH"
+      ],
+      "description": "Purchase of 20No Toyota Hillux 2019 model (Contractor Financing)"
+    },
+    {
+      "rank": 6,
+      "score": 92,
+      "amount": 745000000.0,
+      "mda": "Ministry of Lands and Survey",
+      "location": "State Wide",
+      "flags": [
+        "CONTEXT_MISMATCH:MEDIUM",
+        "MANDATE_MISMATCH:MEDIUM",
+        "VAGUE_HIGH_VALUE_SPEND:MEDIUM",
+        "COMPOSITE_DUPLICATE:HIGH"
+      ],
+      "description": "and Sanitation, Forestry Regeneration (UN-HABITA) Payment of Compensation for New Areas in Minna and Affected by"
+    },
+    {
+      "rank": 7,
+      "score": 91,
+      "amount": 1040000000.0,
+      "mda": "High Court Headquarters",
+      "location": "CHANCHAGA",
+      "flags": [
+        "INFLATED_AMOUNT:HIGH",
+        "COMPOSITE_DUPLICATE:HIGH"
+      ],
+      "description": "ii. Purchase of 7no Official Vehicles for the Judges"
+    },
+    {
+      "rank": 8,
+      "score": 88,
+      "amount": 900000000.0,
+      "mda": "Ministry of Environment",
+      "location": "State Wide",
+      "flags": [
+        "MANDATE_MISMATCH:MEDIUM",
+        "VAGUE_HIGH_VALUE_SPEND:MEDIUM",
+        "COMPOSITE_DUPLICATE:HIGH"
+      ],
+      "description": "iii. Procurement of Raw and Packaging Materials: Methanol x1, Drumx, 100ml, spirit, 200ml Dimto Bottles, 1Litre Dishwash bootles 70711 - PHARMACEUTICAL PRODUCTS"
+    },
+    {
+      "rank": 9,
+      "score": 88,
+      "amount": 435550000.0,
+      "mda": "Niger State Planning Commission",
+      "location": "CHANCHAGA",
+      "flags": [
+        "MANDATE_MISMATCH:HIGH",
+        "COMPOSITE_DUPLICATE:HIGH"
+      ],
+      "description": "Education in Primary Health Care Sectors(HOPE-GOV)(WORLD BANK) STATISTICAL SERVICES"
+    },
+    {
+      "rank": 10,
+      "score": 85,
+      "amount": 350000000.0,
+      "mda": "Ministry of Agriculture",
+      "location": "State Wide",
+      "flags": [
+        "MANDATE_MISMATCH:MEDIUM",
+        "PHANTOM_SPENDING:MEDIUM",
+        "COMPOSITE_DUPLICATE:HIGH"
+      ],
+      "description": "iv. Purchase of 200no. Ipads for farmers census and Survey across the 70482 - R & D AGRICULTURE, FORESTRY, state FISHING AND HUNTING"
+    }
+  ]
+}

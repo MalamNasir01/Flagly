@@ -29,7 +29,15 @@
       "across nigerian army",
       "across all nigerian",
       "major highways across",
-      "light up our highways"
+      "light up our highways",
+      "state wide",
+      "state-wide",
+      "statewide",
+      "across the state",
+      "across niger state",
+      "across all lgás",
+      "across all lgas",
+      "all local government"
     ],
     "benchmarks_ngn": {
       "roads": 5000000000,
@@ -97,6 +105,95 @@
       "elections": 2000000000,
       "identity_management": 1000000000,
       "recurrent_admin": 500000000
+    },
+    "benchmarks_ngn_state": {
+      "roads": 800000000,
+      "road_maintenance": 400000000,
+      "bridges": 1000000000,
+      "rail": 3000000000,
+      "airports": 2000000000,
+      "ports": 1500000000,
+      "water_transport": 500000000,
+      "housing": 500000000,
+      "urban_infrastructure": 400000000,
+      "health_facilities": 600000000,
+      "medical_equipment": 150000000,
+      "pharmaceuticals": 100000000,
+      "disease_control": 150000000,
+      "primary_schools": 200000000,
+      "secondary_schools": 300000000,
+      "tertiary_education": 800000000,
+      "vocational_training": 150000000,
+      "educational_materials": 50000000,
+      "agriculture_inputs": 200000000,
+      "irrigation": 500000000,
+      "livestock": 150000000,
+      "fisheries": 150000000,
+      "food_storage": 200000000,
+      "water_supply": 150000000,
+      "sanitation": 100000000,
+      "dams": 2000000000,
+      "electricity_generation": 1500000000,
+      "electricity_distribution": 600000000,
+      "renewable_energy": 400000000,
+      "oil_gas": 1500000000,
+      "solid_minerals": 400000000,
+      "ict_infrastructure": 200000000,
+      "broadcasting": 150000000,
+      "postal_services": 100000000,
+      "financial_regulation": 100000000,
+      "taxation": 100000000,
+      "customs": 150000000,
+      "military_equipment": 2000000000,
+      "policing": 300000000,
+      "immigration": 150000000,
+      "corrections": 200000000,
+      "fire_service": 100000000,
+      "disaster_response": 200000000,
+      "refugee_support": 150000000,
+      "social_welfare": 150000000,
+      "youth_programs": 100000000,
+      "sports_facilities": 400000000,
+      "cultural_facilities": 200000000,
+      "tourism_facilities": 200000000,
+      "markets": 200000000,
+      "industrial_parks": 800000000,
+      "trade_facilitation": 150000000,
+      "environmental_protection": 150000000,
+      "climate_action": 150000000,
+      "forestry": 100000000,
+      "gender_programs": 80000000,
+      "child_welfare": 80000000,
+      "labour_programs": 80000000,
+      "diplomacy": 150000000,
+      "justice_administration": 150000000,
+      "research_development": 150000000,
+      "population_data": 100000000,
+      "elections": 400000000,
+      "identity_management": 200000000,
+      "recurrent_admin": 150000000
+    },
+    "benchmark_tiers_state": {
+      "roads": {
+        "large_keywords": ["expressway", "dual carriageway", "highway", "bypass"],
+        "large_benchmark_ngn": 5000000000
+      },
+      "health_facilities": {
+        "large_keywords": ["specialist hospital", "general hospital", "teaching hospital"],
+        "large_benchmark_ngn": 4000000000
+      },
+      "housing": {
+        "large_keywords": ["housing estate", "mass housing"],
+        "large_benchmark_ngn": 3000000000
+      },
+      "electricity_generation": {
+        "large_keywords": ["power plant", "megawatt", "solar farm"],
+        "large_benchmark_ngn": 8000000000
+      },
+      "tertiary_education": {
+        "large_keywords": ["university campus", "college of medicine"],
+        "large_benchmark_ngn": 3000000000
+      }
     },
     "benchmark_tiers": {
       "sports_facilities": {
@@ -251,7 +348,8 @@
       "duplication": ["DUPLICATE_CLUSTER", "COMPOSITE_DUPLICATE", "BUDGET_SPLITTING"],
       "mandate": ["MANDATE_MISMATCH"],
       "ghost": ["GHOST_PROJECT", "PHANTOM_SPENDING", "ZERO_ROLLOVER"],
-      "overhead": ["OVERHEAD_DOMINANCE"]
+      "overhead": ["OVERHEAD_DOMINANCE"],
+      "approved_amount": ["BLANK_APPROVED_AMOUNT"]
     }
   }
 }

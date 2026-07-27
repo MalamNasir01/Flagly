@@ -107,6 +107,7 @@ def _normalize_mda_mandates(raw) -> dict:
             'aliases': item.get('aliases') or [],
             'scope': item.get('scope') or [],
             'excluded': item.get('excluded') or [],
+            'mda_code': item.get('mda_code'),
         }
     return out
 
@@ -120,8 +121,15 @@ VAGUE_LOCATION_PHRASES = [r['phrase'] for r in VAGUE_LOCATION_PHRASE_RECORDS]
 VAGUE_PHRASE_SEVERITY = {r['phrase']: r.get('severity') for r in VAGUE_LOCATION_PHRASE_RECORDS}
 
 MDA_MANDATES = _normalize_mda_mandates(_load_json('mda_mandates.json', {}))
+STATE_MDA_MANDATES = _normalize_mda_mandates(_load_json('mda_mandates_states.json', {}))
+# Active mandate table — swapped per run_all_flags(jurisdiction=...)
+ACTIVE_MDA_MANDATES = MDA_MANDATES
 NIGERIA_GEO = _load_json('nigeria_states_lgas.json', {'states': []})
-print(f"[flags] loaded {len(MDA_MANDATES)} MDA mandates, {len(VAGUE_LOCATION_PHRASES)} vague phrases")
+print(
+    f"[flags] loaded {len(MDA_MANDATES)} federal MDA mandates, "
+    f"{len(STATE_MDA_MANDATES)} state MDA mandates, "
+    f"{len(VAGUE_LOCATION_PHRASES)} vague phrases"
+)
 
 _STATE_NAMES = [s['name'] for s in NIGERIA_GEO.get('states', [])]
 _LGA_NAMES = [lga for s in NIGERIA_GEO.get('states', []) for lga in s.get('lgas', [])]
@@ -230,22 +238,28 @@ _AGGREGATE_RE = re.compile(
 )
 
 
-def _aggregate_signal(description: str) -> Optional[str]:
-    """Return matched aggregate phrase if line is a programme/nationwide aggregate."""
-    if not description:
-        return None
-    text = description.lower()
+def _aggregate_signal(description: str, location: Optional[str] = None) -> Optional[str]:
+    """Return matched aggregate phrase if line is a programme/nationwide aggregate.
+
+    Also checks location labels such as "State Wide" so state unit-price inflation
+    does not treat statewide aggregates as single projects.
+    """
+    blobs = [description or "", location or ""]
     from engines.classifier import get_flag_config
     cfg = get_flag_config().get('inflated') or {}
     if 'aggregate_exempt_signals' in cfg:
         phrases = cfg.get('aggregate_exempt_signals') or []
     else:
         phrases = _DEFAULT_AGGREGATE_SIGNALS
-    for phrase in sorted((str(p).lower() for p in phrases), key=len, reverse=True):
-        if phrase and phrase in text:
-            return phrase
-    # Regex fallback only when using defaults (config key absent), not when explicitly emptied.
-    if 'aggregate_exempt_signals' not in cfg:
+    phrases_sorted = sorted((str(p).lower() for p in phrases), key=len, reverse=True)
+    for blob in blobs:
+        text = blob.lower()
+        if not text:
+            continue
+        for phrase in phrases_sorted:
+            if phrase and phrase in text:
+                return phrase
+    if 'aggregate_exempt_signals' not in cfg and description:
         m = _AGGREGATE_RE.search(description)
         return m.group(0).lower() if m else None
     return None
@@ -282,12 +296,14 @@ def flag_inflated_amount(row: Dict) -> Optional[Dict]:
         return None
 
     # Aggregate / programme-wide lines: exempt from unit-price inflation
-    agg_hit = _aggregate_signal(description)
+    loc = _str_cell(row.get('location'))
+    agg_hit = _aggregate_signal(description, loc)
     if agg_hit:
         row['_inflation_exempt'] = agg_hit
         return None
 
-    meta = get_inflated_benchmark_meta(category, description)
+    jurisdiction = row.get('_jurisdiction') or 'federal'
+    meta = get_inflated_benchmark_meta(category, description, jurisdiction=jurisdiction)
     benchmark = meta.get('benchmark')
     if benchmark is None or benchmark <= 0:
         return None
@@ -870,16 +886,27 @@ def _classify_sector(text: str) -> Optional[str]:
     return None
 
 
-def _lookup_mda_scope(mda_name: str) -> Optional[Dict]:
-    if not mda_name or not MDA_MANDATES:
+def _lookup_mda_scope(mda_name: str, mda_code: Optional[str] = None) -> Optional[Dict]:
+    mandates = ACTIVE_MDA_MANDATES or MDA_MANDATES
+    if not mandates:
+        return None
+    code = str(mda_code or "").strip()
+    if code:
+        for meta in mandates.values():
+            aliases = [str(a).strip() for a in (meta.get('aliases') or [])]
+            if code == str(meta.get('mda_code') or "").strip() or code in aliases:
+                return meta
+    if not mda_name:
         return None
     key = mda_name.strip().upper()
-    if key in MDA_MANDATES:
-        return MDA_MANDATES[key]
-    for name, meta in MDA_MANDATES.items():
+    if key in mandates:
+        return mandates[key]
+    for name, meta in mandates.items():
         aliases = [a.upper() for a in meta.get('aliases', [])]
         canon = (meta.get('name') or name).upper()
-        if key == name.upper() or key == canon or key in aliases or any(a in key or key in a for a in aliases + [canon]):
+        if key == name.upper() or key == canon or key in aliases or any(
+            a in key or key in a for a in aliases + [canon]
+        ):
             return meta
     return None
 
@@ -915,7 +942,7 @@ def flag_mandate_mismatch(row: Dict) -> Optional[Dict]:
     if not category:
         return None
 
-    meta = _lookup_mda_scope(ministry)
+    meta = _lookup_mda_scope(ministry, row.get('mda_code'))
     if not meta:
         return None
 
@@ -945,7 +972,8 @@ def flag_mandate_mismatch(row: Dict) -> Optional[Dict]:
             f'Request the enabling instrument or procurement plan from the MDA.'
         ),
         'evidence': {
-            'mda': ministry,
+            'mda': meta.get('name') or ministry,
+            'mda_code': row.get('mda_code'),
             'scope': scope,
             'excluded': excluded,
             'project_category': cat,
@@ -1159,18 +1187,89 @@ def flag_zero_implementation_rollover(row: Dict) -> Optional[Dict]:
     }
 
 
+# ─── Flag: BLANK_APPROVED_AMOUNT (state / Format B) ───────────────────────────
+
+def flag_blank_approved_amount(row: Dict) -> Optional[Dict]:
+    """Surface rows whose 2026 approved amount is blank — do not drop them silently.
+
+    MEDIUM when prior-year actuals/budget/performance exist (dropped/completed/rollover
+    question). LOW when the approved column is blank with no prior-year figures.
+    Federal Format A/C rows are unaffected (gate on jurisdiction/format_b).
+    """
+    jurisdiction = str(row.get('_jurisdiction') or '')
+    if not (jurisdiction.startswith('state') or row.get('_format_b')):
+        return None
+    if row.get('is_mda_level'):
+        return None
+    if not _is_null_amount(row.get('amount')):
+        return None
+
+    prior_fields = {}
+    for key, label in (
+        ('actuals_2024', '2024 actuals'),
+        ('budget_2025', '2025 revised budget'),
+        ('performance_2025', '2025 performance'),
+    ):
+        val = row.get(key)
+        if not _is_null_amount(val) and float(val) != 0:
+            prior_fields[label] = float(val)
+
+    if prior_fields:
+        severity = 'MEDIUM'
+        title = 'Blank 2026 Approved Amount (Prior Spend)'
+        explanation = (
+            'This line has no 2026 approved amount, but prior-year figures are present '
+            f"({', '.join(f'{k}={_fmt_amount(v)}' for k, v in prior_fields.items())}). "
+            'Ask whether the project was dropped, completed, or rolled without a 2026 vote.'
+        )
+    else:
+        severity = 'LOW'
+        title = 'Blank 2026 Approved Amount'
+        explanation = (
+            'This capital line has a blank 2026 approved amount in the state budget table. '
+            'It is retained in the scan for completeness; confirm whether funding is nil or omitted.'
+        )
+
+    return {
+        'flag_type': 'BLANK_APPROVED_AMOUNT',
+        'severity': severity,
+        'title': title,
+        'explanation': explanation,
+        'evidence': {
+            'amount_2026': None,
+            'prior_year_fields': prior_fields,
+            'budget_2026': row.get('budget_2026'),
+        },
+    }
+
+
 # ─── Main runner ──────────────────────────────────────────────────────────────
 
-def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
-    """Run all flag checks and return list of flagged item dicts."""
+def run_all_flags(
+    df,
+    budget_year: Optional[str] = None,
+    jurisdiction: str = 'federal',
+) -> List[Dict]:
+    """Run flag checks and return list of flagged item dicts.
+
+    jurisdiction:
+      'federal'     — federal MDA mandates + federal inflation benchmarks
+      'state_niger' — state MDA mandates + state inflation benchmarks
+                      (also enables Format-B YoY flags when columns present)
+    """
     from engines.classifier import classify_with_match
 
-    global LAST_RUN_STATS
+    global LAST_RUN_STATS, ACTIVE_MDA_MANDATES
+
+    is_state = str(jurisdiction or '').startswith('state')
+    ACTIVE_MDA_MANDATES = STATE_MDA_MANDATES if is_state else MDA_MANDATES
+
     rows = df.to_dict('records')
 
     for row in rows:
-        row['_flags']   = []
+        row['_flags'] = []
         row['_exclude'] = False
+        row['_jurisdiction'] = jurisdiction
         desc = _str_cell(row.get('description') or row.get('project_name'))
         cat, kw = classify_with_match(desc)
         row['_project_category'] = cat
@@ -1181,6 +1280,7 @@ def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
         'total_items': len(rows),
         'unclassified_count': unclassified,
         'flagged_items': 0,
+        'jurisdiction': jurisdiction,
     }
     if unclassified:
         print(f"[flags] unclassified lines: {unclassified} of {len(rows)} "
@@ -1188,58 +1288,78 @@ def run_all_flags(df, budget_year: Optional[str] = None) -> List[Dict]:
 
     # Format B (state YoY sheets) carries multi-year amount columns / 8-digit economic codes.
     # Do NOT use mda_code presence — Format C also fills 10-digit MDA codes from section headers.
-    is_format_b = False
-    if 'actuals_2024' in df.columns and df['actuals_2024'].notna().any():
-        is_format_b = True
-    elif 'economic_code' in df.columns and df['economic_code'].notna().any():
-        is_format_b = True
-    elif 'mda_code' in df.columns:
-        # Legacy Format B MDA codes are 12-digit; Format C section codes are 10-digit.
-        sample_codes = (
-            df['mda_code'].dropna().astype(str).str.strip()
-            .head(50)
-        )
-        if any(len(c) == 12 and c.isdigit() for c in sample_codes):
+    is_format_b = bool(is_state)
+    if not is_format_b:
+        if 'actuals_2024' in df.columns and df['actuals_2024'].notna().any():
             is_format_b = True
+        elif 'economic_code' in df.columns and df['economic_code'].notna().any():
+            is_format_b = True
+        elif 'mda_code' in df.columns:
+            sample_codes = (
+                df['mda_code'].dropna().astype(str).str.strip()
+                .head(50)
+            )
+            if any(len(c) == 12 and c.isdigit() for c in sample_codes):
+                is_format_b = True
+
+    for row in rows:
+        row['_format_b'] = is_format_b
 
     all_descriptions = [_str_cell(r.get('description') or r.get('project_name')) for r in rows]
 
     # Per-row flags — universal
     for row in rows:
         f1 = flag_inflated_amount(row)
-        if f1: row['_flags'].append(f1)
+        if f1:
+            row['_flags'].append(f1)
 
         f2 = flag_context_mismatch(row)
-        if f2: row['_flags'].append(f2)
+        if f2:
+            row['_flags'].append(f2)
 
         f3 = flag_missing_location(row)
-        if f3: row['_flags'].append(f3)
+        if f3:
+            row['_flags'].append(f3)
 
         f5 = flag_ghost_project(row, all_descriptions, budget_year)
-        if f5: row['_flags'].append(f5)
+        if f5:
+            row['_flags'].append(f5)
 
         fa = flag_vague_location(row)
-        if fa: row['_flags'].append(fa)
+        if fa:
+            row['_flags'].append(fa)
 
         fc = flag_mandate_mismatch(row)
-        if fc: row['_flags'].append(fc)
+        if fc:
+            row['_flags'].append(fc)
 
-        fe = flag_overhead_dominance(row)
-        if fe: row['_flags'].append(fe)
+        # Overhead dominance needs Format A MDA-level overhead/capital columns — skip on state
+        if not is_state:
+            fe = flag_overhead_dominance(row)
+            if fe:
+                row['_flags'].append(fe)
 
-        # Per-row flags — Format B only
+        # Per-row flags — Format B / state YoY
         if is_format_b:
             f6 = flag_inflated_projection(row)
-            if f6: row['_flags'].append(f6)
+            if f6:
+                row['_flags'].append(f6)
 
             f7 = flag_phantom_spending(row)
-            if f7: row['_flags'].append(f7)
+            if f7:
+                row['_flags'].append(f7)
 
             f8 = flag_vague_high_value_spend(row)
-            if f8: row['_flags'].append(f8)
+            if f8:
+                row['_flags'].append(f8)
 
             f9 = flag_zero_implementation_rollover(row)
-            if f9: row['_flags'].append(f9)
+            if f9:
+                row['_flags'].append(f9)
+
+            fb = flag_blank_approved_amount(row)
+            if fb:
+                row['_flags'].append(fb)
 
     # Batch flags (modify rows in-place)
     rows = flag_iqr_outliers(rows)

@@ -17,12 +17,13 @@ from typing import List, Dict, Optional, Tuple
 
 # Default overlap groups — location / price stacks must not triple-count.
 _DEFAULT_OVERLAP_GROUPS = {
-    'location_quality': ['MISSING_LOCATION', 'VAGUE_LOCATION', 'VAGUE_HIGH_VALUE'],
+    'location_quality': ['MISSING_LOCATION', 'VAGUE_LOCATION', 'VAGUE_HIGH_VALUE', 'VAGUE_HIGH_VALUE_SPEND'],
     'price_anomaly': ['INFLATED_AMOUNT', 'INFLATED_PROJECTION', 'CONTEXT_MISMATCH'],
     'duplication': ['DUPLICATE_CLUSTER', 'COMPOSITE_DUPLICATE', 'BUDGET_SPLITTING'],
     'mandate': ['MANDATE_MISMATCH'],
     'ghost': ['GHOST_PROJECT', 'PHANTOM_SPENDING', 'ZERO_ROLLOVER'],
     'overhead': ['OVERHEAD_DOMINANCE'],
+    'approved_amount': ['BLANK_APPROVED_AMOUNT'],
 }
 
 _SEV_WEIGHT = {'HIGH': 3, 'MEDIUM': 1, 'LOW': 0}

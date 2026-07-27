@@ -1,0 +1,226 @@
+{
+  "total_items": 1014,
+  "budget_format": "state_niger",
+  "parse_only_no_flags": true,
+  "flags_reason": "intentional_parse_only",
+  "flags_explanation": "State uploads intentionally skip run_all_flags/score_items in process_single when budget_format == state_niger (Step 1 scope). Not a failure.",
+  "duplicate_check": {
+    "key": "mda_code + description + amount",
+    "duplicate_groups": 0,
+    "extra_duplicate_rows": 0,
+    "unique_keys": 1014,
+    "sample_duplicates": []
+  },
+  "mda_name_non_null_pct": 100.0,
+  "amount_2026_non_null_pct": 70.32,
+  "amount_2026_non_null_nonzero_pct": 70.32,
+  "columns_detected": [
+    "project_name",
+    "administrative",
+    "economic",
+    "function",
+    "location",
+    "actuals_2024",
+    "budget_2025",
+    "performance_2025",
+    "approved_2026"
+  ],
+  "amount_column_used": "approved_2026",
+  "amount_column_label": "2026 Approved Budget",
+  "sample_15": [
+    {
+      "description": "Construction of Accommodation for Development partners",
+      "amount_2026": 1000000000.0,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Executive Governor",
+      "mda_code": "011100100100"
+    },
+    {
+      "description": "Construction of 12no. Offices in Government House",
+      "amount_2026": 1400000000.0,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Executive Governor",
+      "mda_code": "011100100100"
+    },
+    {
+      "description": "Construction of Additional 9.no Guest Houses, Minna",
+      "amount_2026": 2100000000.0,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Executive Governor",
+      "mda_code": "011100100100"
+    },
+    {
+      "description": "Remodelling & renovation of Kaduna liason office",
+      "amount_2026": 400000000.0,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Executive Governor",
+      "mda_code": "011100100100"
+    },
+    {
+      "description": "Renovation of Administrative block in Government House, Minna",
+      "amount_2026": 100000000.0,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Executive Governor",
+      "mda_code": "011100100100"
+    },
+    {
+      "description": "Provision of 28nos Executive Tables and Chairs for Additional 17no Guest Houses Behind Government House",
+      "amount_2026": 1500000000.0,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Executive Governor",
+      "mda_code": "011100100100"
+    },
+    {
+      "description": "Purchase of 2no. Mikano sound proof 500KVA generator",
+      "amount_2026": 200000000.0,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Executive Governor",
+      "mda_code": "011100100100"
+    },
+    {
+      "description": "Purchase of 25nos Executive Tables and Chairs for the Accomodation of Development Partners",
+      "amount_2026": null,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Executive Governor",
+      "mda_code": "011100100100"
+    },
+    {
+      "description": "Purchase of 20nos tables and chairs and 1no 25 seater round table for Offices in Government House",
+      "amount_2026": 500000000.0,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Executive Governor",
+      "mda_code": "011100100100"
+    },
+    {
+      "description": "Purchase of 10nos HP Laptops, 2nos Laserjet Printer, 2nos phopto copier Machines and 15nos seater round table for Strategic Communication",
+      "amount_2026": 300000000.0,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Executive Governor",
+      "mda_code": "011100100100"
+    },
+    {
+      "description": "Renovation of 8 no. Guest Houses behind Government House",
+      "amount_2026": 1000000000.0,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Executive Governor",
+      "mda_code": "011100100100"
+    },
+    {
+      "description": "purchase of 1no of (maikano)standby generator",
+      "amount_2026": null,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Deputy Governor",
+      "mda_code": "011100100200"
+    },
+    {
+      "description": "Procuring of two (3bedroom corpers lodge.",
+      "amount_2026": 20000000.0,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Deputy Governor",
+      "mda_code": "011100100200"
+    },
+    {
+      "description": "Procuring of one (3bedroom) visitors lodge.",
+      "amount_2026": 50000000.0,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Deputy Governor",
+      "mda_code": "011100100200"
+    },
+    {
+      "description": "purchase of 2nos of bed,1wheel chair,2drip stand,2stretcher,1scale,1digital sphymomanometer,1instrument box",
+      "amount_2026": 20000000.0,
+      "location": "CHANCHAGA",
+      "mda_name": "Office of the Deputy Governor",
+      "mda_code": "011100100200"
+    }
+  ],
+  "amount_column_proof_5": [
+    {
+      "raw_line": "FGN Grant for State Social Investment projects (SIP)                    016101300100 - Social Investment Programme (SIP)                  13020102 - CAPITAL GRANTS FROM FGN    08304 - DONATIONS BY FED. GOVERNMENT                               -            3,658,254,000.00                        -            10,050,000,000.00",
+      "tokens_in_amount_region": [
+        "-",
+        "3,658,254,000.00",
+        "-",
+        "10,050,000,000.00"
+      ],
+      "mapped": {
+        "actuals_2024": null,
+        "budget_2025": 3658254000.0,
+        "performance_2025": null,
+        "approved_2026_USED_AS_AMOUNT": 10050000000.0
+      },
+      "project_name_left": "FGN Grant for State Social Investment projects (SIP)"
+    },
+    {
+      "raw_line": "Sustainable Fishing for a Healthy Enviroment (Food and Agricultural     021500100100 - Ministry of Agriculture                            13020102 - CAPITAL GRANTS FROM FGN    08304 - DONATIONS BY FED. GOVERNMENT                               -             397,800,000.00                         -                          -",
+      "tokens_in_amount_region": [
+        "-",
+        "397,800,000.00",
+        "-",
+        "-"
+      ],
+      "mapped": {
+        "actuals_2024": null,
+        "budget_2025": 397800000.0,
+        "performance_2025": null,
+        "approved_2026_USED_AS_AMOUNT": null
+      },
+      "project_name_left": "Sustainable Fishing for a Healthy Enviroment (Food and Agricultural"
+    },
+    {
+      "raw_line": "FGN Grant for Support to State on Infrastructural development          022000100100 - Ministry of Finance                          13020102 - CAPITAL GRANTS FROM FGN           03101 - CAPITAL DEVELOPMENT FUND                                   -           35,000,000,000.00                        -            35,000,000,000.00",
+      "tokens_in_amount_region": [
+        "-",
+        "35,000,000,000.00",
+        "-",
+        "35,000,000,000.00"
+      ],
+      "mapped": {
+        "actuals_2024": null,
+        "budget_2025": 35000000000.0,
+        "performance_2025": null,
+        "approved_2026_USED_AS_AMOUNT": 35000000000.0
+      },
+      "project_name_left": "FGN Grant for Support to State on Infrastructural development"
+    },
+    {
+      "raw_line": "Local Government Grants for Joint LGA-State Capital Projects               022000800100 - Board of Internal Revenue                       13020202 - CAPITAL FOREIGN GRANTS     03101 - CAPITAL DEVELOPMENT FUND                      5,500,000,000.00         30,000,000,000.00           6,750,000,000.00                        -",
+      "tokens_in_amount_region": [
+        "5,500,000,000.00",
+        "30,000,000,000.00",
+        "6,750,000,000.00",
+        "-"
+      ],
+      "mapped": {
+        "actuals_2024": 5500000000.0,
+        "budget_2025": 30000000000.0,
+        "performance_2025": 6750000000.0,
+        "approved_2026_USED_AS_AMOUNT": null
+      },
+      "project_name_left": "Local Government Grants for Joint LGA-State Capital Projects"
+    },
+    {
+      "raw_line": " FG Grant for the establishment of CNG Daughter Station                    022900100100 - Ministry for Transport                          13020102 - CAPITAL GRANTS FROM FGN    08304 - DONATIONS BY FED. GOVERNMENT                               -            4,000,000,000.00                        -                          -",
+      "tokens_in_amount_region": [
+        "-",
+        "4,000,000,000.00",
+        "-",
+        "-"
+      ],
+      "mapped": {
+        "actuals_2024": null,
+        "budget_2025": 4000000000.0,
+        "performance_2025": null,
+        "approved_2026_USED_AS_AMOUNT": null
+      },
+      "project_name_left": "FG Grant for the establishment of CNG Daughter Station"
+    }
+  ],
+  "federal": {
+    "rows": 17873,
+    "baseline_rows": 17873,
+    "hash": "80a822c9e43481cfd956bc713c20048a079b6c1a9fa356eb145ee1037ef57936",
+    "baseline_hash": "80a822c9e43481cfd956bc713c20048a079b6c1a9fa356eb145ee1037ef57936",
+    "unchanged": true
+  }
+}

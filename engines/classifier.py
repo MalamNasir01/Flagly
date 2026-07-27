@@ -181,15 +181,28 @@ def get_inflated_benchmark(category: str, description: Optional[str] = None) -> 
     return meta.get('benchmark')
 
 
-def get_inflated_benchmark_meta(category: str, description: Optional[str] = None) -> dict:
-    """Return benchmark + which tier was selected (for evidence)."""
+def get_inflated_benchmark_meta(
+    category: str,
+    description: Optional[str] = None,
+    jurisdiction: str = "federal",
+) -> dict:
+    """Return benchmark + which tier was selected (for evidence).
+
+    jurisdiction='state*' uses inflated.benchmarks_ngn_state when present.
+    """
     cfg = get_flag_config()
     inflated = cfg.get('inflated') or {}
-    benchmarks = inflated.get('benchmarks_ngn') or {}
+    use_state = str(jurisdiction or "").lower().startswith("state")
+    if use_state and inflated.get("benchmarks_ngn_state"):
+        benchmarks = inflated.get("benchmarks_ngn_state") or {}
+        tiers_root = inflated.get("benchmark_tiers_state") or inflated.get("benchmark_tiers") or {}
+    else:
+        benchmarks = inflated.get("benchmarks_ngn") or {}
+        tiers_root = inflated.get("benchmark_tiers") or {}
     base = benchmarks.get(category)
     if base is None:
-        return {'benchmark': None, 'tier': None, 'matched_tier_keyword': None}
-    tiers = (inflated.get('benchmark_tiers') or {}).get(category) or {}
+        return {'benchmark': None, 'tier': None, 'matched_tier_keyword': None, 'jurisdiction': jurisdiction}
+    tiers = tiers_root.get(category) or {}
     large_kws = [str(k).lower() for k in (tiers.get('large_keywords') or [])]
     large_bench = tiers.get('large_benchmark_ngn')
     if description and large_kws and large_bench is not None:
@@ -200,11 +213,13 @@ def get_inflated_benchmark_meta(category: str, description: Optional[str] = None
                     'benchmark': float(large_bench),
                     'tier': 'large',
                     'matched_tier_keyword': kw,
+                    'jurisdiction': jurisdiction,
                 }
     return {
         'benchmark': float(base),
         'tier': 'default',
         'matched_tier_keyword': None,
+        'jurisdiction': jurisdiction,
     }
 
 
