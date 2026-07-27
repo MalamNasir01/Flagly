@@ -28,7 +28,7 @@ a{color:inherit;text-decoration:none}
 .container{max-width:1180px;margin:0 auto;padding:0 24px}
 
 /* Nav */
-.nav{position:sticky;top:0;z-index:200;background:var(--bg);border-bottom:1px solid var(--border);padding:14px 0}
+.nav{position:sticky;top:0;z-index:200;background:var(--bg);border-bottom:1px solid var(--border);padding:16px 0}
 .nav-inner{display:flex;align-items:center;gap:32px;max-width:1180px;margin:0 auto;padding:0 24px}
 .nav-links{display:flex;gap:28px;margin-left:auto}
 .nav-links a{font-size:13px;font-weight:500;color:var(--ink-600);letter-spacing:0.02em;transition:color .15s}
@@ -36,8 +36,8 @@ a{color:inherit;text-decoration:none}
 .nav-cta{background:var(--red-500);color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;transition:background .15s;white-space:nowrap}
 .nav-cta:hover{background:var(--red-600)}
 .logo{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none}
-.logo img{height:40px;width:auto;display:block}
-.logo-mark{height:32px;width:32px;display:none}
+.logo img{height:64px;width:auto;display:block}
+.logo-mark{height:40px;width:40px;display:none}
 
 /* Hero */
 .hero{padding:72px 0 56px;background:var(--bg-alt)}
@@ -304,6 +304,7 @@ tbody td{padding:11px 12px;font-size:12px;vertical-align:middle}
   .chart-card .chart-wrap.tall{min-height:360px}
 }
 @media(max-width:768px){
+  .logo img{height:52px}
   .nav-links{display:none}
   .stat-grid,.steps-grid{grid-template-columns:1fr 1fr}
   .detect-grid{grid-template-columns:1fr 1fr}
