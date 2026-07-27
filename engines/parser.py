@@ -96,20 +96,61 @@ def _to_float(val):
 # ─── Entry point ─────────────────────────────────────────────────────────────
 
 def parse_file(contents: bytes, filename: str) -> Optional[pd.DataFrame]:
-    """Entry point — dispatch by file extension."""
+    """Auto-detect file type and budget format, then dispatch.
+
+    Supported PDF formats: federal_fgn (Format A/C), state_niger (profile).
+    Raises UnsupportedBudgetFormat when the layout is not recognized.
+    Attaches df.attrs['budget_format'] and df.attrs['parse_meta'] when present.
+    """
+    from engines.format_detect import (
+        FORMAT_FEDERAL,
+        FORMAT_STATE_NIGER,
+        FORMAT_UNKNOWN,
+        UnsupportedBudgetFormat,
+        detect_budget_format,
+    )
+
     try:
         name_lower = filename.lower()
         if name_lower.endswith('.pdf'):
-            return _parse_pdf(contents)
+            fmt = detect_budget_format(contents)
+            print(f"[diag] budget_format={fmt}")
+            if fmt == FORMAT_UNKNOWN:
+                raise UnsupportedBudgetFormat()
+            if fmt == FORMAT_STATE_NIGER:
+                from engines.state_formats import parse_state_pdf
+                df, meta = parse_state_pdf(contents, "state_niger")
+                df.attrs["budget_format"] = FORMAT_STATE_NIGER
+                df.attrs["parse_meta"] = meta
+                return df
+            # federal_fgn — existing Format C then A (Format B no longer routed)
+            return _parse_pdf_federal(contents)
         elif name_lower.endswith('.xlsx') or name_lower.endswith('.xls'):
-            return _parse_excel(contents, filename)
+            df = _parse_excel(contents, filename)
+            df.attrs["budget_format"] = FORMAT_FEDERAL
+            return df
         elif name_lower.endswith('.csv'):
-            return _parse_csv(contents)
+            df = _parse_csv(contents)
+            df.attrs["budget_format"] = FORMAT_FEDERAL
+            return df
         else:
             try:
-                return _parse_pdf(contents)
+                fmt = detect_budget_format(contents)
+                if fmt == FORMAT_STATE_NIGER:
+                    from engines.state_formats import parse_state_pdf
+                    df, meta = parse_state_pdf(contents, "state_niger")
+                    df.attrs["budget_format"] = FORMAT_STATE_NIGER
+                    df.attrs["parse_meta"] = meta
+                    return df
+                if fmt == FORMAT_FEDERAL:
+                    return _parse_pdf_federal(contents)
+                raise UnsupportedBudgetFormat()
+            except UnsupportedBudgetFormat:
+                raise
             except Exception:
                 return _parse_excel(contents, filename)
+    except UnsupportedBudgetFormat:
+        raise
     except Exception as e:
         print(f"[parser] parse_file error: {e}")
         return pd.DataFrame()
@@ -117,30 +158,37 @@ def parse_file(contents: bytes, filename: str) -> Optional[pd.DataFrame]:
 
 # ─── PDF dispatch ─────────────────────────────────────────────────────────────
 
-def _parse_pdf(contents: bytes) -> pd.DataFrame:
-    """Detect format then dispatch."""
+def _parse_pdf_federal(contents: bytes) -> pd.DataFrame:
+    """Detect Format C vs A for federal PDFs. Does not route to Format B."""
+    from engines.format_detect import FORMAT_FEDERAL
+
     try:
         import pdfplumber
     except ImportError:
-        return _parse_pdf_format_b(contents)
+        df = _parse_pdf_format_a(contents)
+        df.attrs["budget_format"] = FORMAT_FEDERAL
+        return df
 
-    is_format_b = False
     is_format_c = False
     try:
         with pdfplumber.open(io.BytesIO(contents)) as pdf:
-            is_format_b = _detect_format_b(pdf)
-            if not is_format_b:
-                is_format_c = _detect_format_c(pdf)
+            is_format_c = _detect_format_c(pdf)
     except Exception:
         pass
 
-    print(f"[diag] is_format_b={is_format_b}  is_format_c={is_format_c}")
-    if is_format_b:
-        return _parse_pdf_format_b(contents)
-    elif is_format_c:
-        return _parse_pdf_format_c(contents)
+    print(f"[diag] federal path: is_format_c={is_format_c}")
+    if is_format_c:
+        df = _parse_pdf_format_c(contents)
     else:
-        return _parse_pdf_format_a(contents)
+        df = _parse_pdf_format_a(contents)
+    df.attrs["budget_format"] = FORMAT_FEDERAL
+    df.attrs["parse_meta"] = {"federal_subformat": "C" if is_format_c else "A"}
+    return df
+
+
+def _parse_pdf(contents: bytes) -> pd.DataFrame:
+    """Backward-compatible alias — federal detection only (no Format B)."""
+    return _parse_pdf_federal(contents)
 
 
 def _detect_format_b(pdf) -> bool:

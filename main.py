@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 import pandas as pd
 
 from engines.parser import parse_file
+from engines.format_detect import UnsupportedBudgetFormat, FORMAT_STATE_NIGER
 from engines.flags import run_all_flags, flag_ghost_projects_multiyear, get_last_run_stats
 from engines.scorer import score_items
 from engines.query import generate_narratives, answer_question, visuals_payload, safe_float
@@ -145,14 +146,56 @@ def summarize_scan(df: pd.DataFrame, results: List[Dict]) -> Dict[str, Any]:
 
 
 def process_single(contents: bytes, filename: str, budget_year: str) -> Dict[str, Any]:
-    df = parse_file(contents, filename)
+    try:
+        df = parse_file(contents, filename)
+    except UnsupportedBudgetFormat as e:
+        raise ValueError(str(e)) from e
     if df is None or df.empty:
         raise ValueError("Could not extract any data from the uploaded file. Please check the format.")
+
+    budget_format = df.attrs.get("budget_format") or "federal_fgn"
+    parse_meta = df.attrs.get("parse_meta") or {}
+
+    # Step 1 (state support): parse-only — do not run federal flag engines yet.
+    if budget_format == FORMAT_STATE_NIGER:
+        items = df.to_dict("records")
+        total_amount = safe_float(df["amount"].sum()) if "amount" in df.columns else 0.0
+        return {
+            "budget_year": budget_year,
+            "filename": filename,
+            "budget_format": budget_format,
+            "parse_only": True,
+            "parse_meta": parse_meta,
+            "total_items": len(df),
+            "flagged_items": 0,
+            "high_risk": 0,
+            "medium_risk": 0,
+            "low_risk": 0,
+            "at_risk_amount": 0.0,
+            "total_amount": total_amount,
+            "flag_summary": dict(EMPTY_FLAG_SUMMARY),
+            "results": [],
+            "shortlist": [],
+            "items": items,
+            "unclassified_count": 0,
+            "flag_rate": 0.0,
+            "narratives": [],
+            "visuals": {},
+            "multi_year": False,
+            "ghost_enabled": False,
+            "message": (
+                "Niger State budget parsed successfully. Flag detection for state "
+                "budgets is not enabled yet — verify parse quality first."
+            ),
+        }
+
     flagged_rows = run_all_flags(df, budget_year=budget_year)
     scored = score_items(flagged_rows) if flagged_rows else []
     out = summarize_scan(df, scored)
     out["budget_year"] = budget_year
     out["filename"] = filename
+    out["budget_format"] = budget_format
+    out["parse_meta"] = parse_meta
     out["narratives"] = generate_narratives(scored)
     out["visuals"] = visuals_payload(scored)
     out["multi_year"] = False
@@ -244,9 +287,22 @@ async def scan(
                 )
             filename = up.filename or "upload"
             print(f"[scan] Multi-year '{filename}' year={yr} ({file_size_mb:.1f} MB)")
-            df = parse_file(contents, filename)
+            try:
+                df = parse_file(contents, filename)
+            except UnsupportedBudgetFormat as e:
+                return json_response({"error": str(e)}, status_code=400)
             if df is None or df.empty:
                 continue
+            if df.attrs.get("budget_format") == FORMAT_STATE_NIGER:
+                return json_response(
+                    {
+                        "error": (
+                            "Multi-year scanning is not available for state budgets yet. "
+                            "Upload a single Niger State file for parse-only verification."
+                        )
+                    },
+                    status_code=400,
+                )
             df = df.copy()
             df["budget_year"] = yr
             all_dfs.append(df)
