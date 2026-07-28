@@ -71,6 +71,9 @@ _ACTION_HEAD_PATTERNS: List[Tuple[re.Pattern, str, str]] = [
         re.I,
     ), 'broadcasting', 'communications campaign'),
     (re.compile(r'\bhigher\s+institutions?\b', re.I), 'tertiary_education', 'higher institutions'),
+    (re.compile(r'\bhope[\s-]?gov\b', re.I), 'research_development', 'hope-gov programme'),
+    (re.compile(r'\bfamily\s+support\s+program(?:me)?\b', re.I), 'social_welfare', 'family support programme'),
+    (re.compile(r'\bstatistical\s+services\b', re.I), 'population_data', 'statistical services'),
     (re.compile(
         r'\b(?:renovation|construction|completion)\b.{0,40}\b(?:classroom|hostel|lecture\s+hall|laboratory)\b'
         r'.{0,60}\b(?:college|university|polytechnic|school\s+of\s+health|midwifery)\b'

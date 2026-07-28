@@ -122,6 +122,26 @@
     {
       "phrase": "sbcc",
       "category": "broadcasting"
+    },
+    {
+      "phrase": "hope-gov",
+      "category": "research_development"
+    },
+    {
+      "phrase": "hope gov",
+      "category": "research_development"
+    },
+    {
+      "phrase": "statistical services",
+      "category": "population_data"
+    },
+    {
+      "phrase": "family support programme",
+      "category": "social_welfare"
+    },
+    {
+      "phrase": "family support program",
+      "category": "social_welfare"
     }
   ],
   "category_exclusions": {
@@ -135,7 +155,11 @@
       "dietary habits",
       "healthy lifestyles",
       "social marketing",
-      "sbcc"
+      "sbcc",
+      "hope-gov",
+      "hope gov",
+      "statistical services",
+      "education in primary health"
     ],
     "primary_schools": [
       "college of",
@@ -146,7 +170,9 @@
       "college of agriculture",
       "school of nursing",
       "within the campus",
-      "within campus"
+      "within campus",
+      "family support programme",
+      "family support program"
     ],
     "roads": [
       "within the campus",

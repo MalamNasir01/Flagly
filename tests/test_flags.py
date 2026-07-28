@@ -425,6 +425,26 @@ class DisambiguationTests(unittest.TestCase):
             'roads',
         )
 
+    def test_hope_gov_is_not_health_facilities(self):
+        from engines.classifier import classify_project, reload_classifier_data
+        reload_classifier_data()
+        cat = classify_project(
+            'Education in Primary Health Care Sectors(HOPE-GOV)(WORLD BANK) STATISTICAL SERVICES'
+        )
+        self.assertIn(cat, ('research_development', 'population_data'))
+        self.assertNotEqual(cat, 'health_facilities')
+
+    def test_family_support_classrooms_are_social_welfare(self):
+        from engines.classifier import classify_project, reload_classifier_data
+        reload_classifier_data()
+        self.assertEqual(
+            classify_project(
+                'Renovation of existing classrooms and completion of 5no. Blocks of 4 '
+                'classrooms at Family Support Programme SCHOOLS'
+            ),
+            'social_welfare',
+        )
+
 
 class AggregateInflationTests(unittest.TestCase):
     def test_nationwide_programme_exempt_from_inflation(self):
