@@ -347,7 +347,7 @@ tbody td{padding:11px 12px;font-size:12px;vertical-align:middle}
   <div class="container hero-grid">
     <div>
       <h1>Find the <em>red flags</em> before the money disappears</h1>
-      <p class="hero-lead">Upload Nigerian public budget files and surface suspicious line items. Inflated amounts, ghost projects, duplicate allocations, and missing accountability data.</p>
+      <p class="hero-lead">Upload Nigerian public budget files and surface suspicious line items. Inflated amounts, ghost projects, duplicate allocations, and missing accountability data. Supported today: Federal FGN and Niger State; Kaduna State onboarded with unreviewed mandates.</p>
       <div class="hero-stats">
         <div class="hero-stat"><div class="num">14</div><div class="lbl">Detection rules</div></div>
         <div class="hero-stat"><div class="num">3</div><div class="lbl">File formats</div></div>
@@ -381,7 +381,7 @@ tbody td{padding:11px 12px;font-size:12px;vertical-align:middle}
   <div class="container">
     <h2>How it works</h2>
     <div class="steps-grid">
-      <div class="step-card"><div class="step-num">01</div><h3>Upload budget files</h3><p>Drop PDF, XLSX, or CSV files from federal or state appropriation bills.</p></div>
+      <div class="step-card"><div class="step-num">01</div><h3>Upload budget files</h3><p>Drop PDF, XLSX, or CSV from Federal FGN appropriation bills or supported state formats (Niger State today; more via profile onboarding).</p></div>
       <div class="step-card"><div class="step-num">02</div><h3>Parser extracts items</h3><p>Every line item is parsed with amount, MDA, location, and project code.</p></div>
       <div class="step-card"><div class="step-num">03</div><h3>Engine flags patterns</h3><p>14 detection rules score each item for inflated amounts, duplicates, and ghost projects.</p></div>
       <div class="step-card"><div class="step-num">04</div><h3>Review and export</h3><p>Filter, search, chat, and export findings as PDF, Excel, or CSV.</p></div>
@@ -429,7 +429,10 @@ tbody td{padding:11px 12px;font-size:12px;vertical-align:middle}
       <div class="dropzone" id="dropzone">
         <input type="file" id="fileInput" accept=".pdf,.xlsx,.xls,.csv" multiple>
         <div class="dropzone-label">Drop budget files here or click to browse</div>
-        <div class="dropzone-hint">PDF, XLSX, XLS, CSV. Federal and state formats supported. Multiple files for multi year scans.</div>
+        <div class="dropzone-hint">PDF, XLSX, XLS, CSV. Supported today: Federal FGN + Niger State (+ Kaduna, mandates unreviewed). Multiple files for multi-year federal scans.</div>
+      </div>
+      <div class="supported-formats" id="supportedFormats" style="font-size:12px;color:var(--ink-600);margin:-8px 0 16px;">
+        <strong style="color:var(--navy-900)">Supported formats:</strong> Federal FGN Appropriation Bill · Niger State Approved Budget · Kaduna State Approved Budget (mandates unreviewed)
       </div>
       <div class="file-list" id="fileList"></div>
       <div class="form-row">
@@ -518,6 +521,7 @@ tbody td{padding:11px 12px;font-size:12px;vertical-align:middle}
           <button class="filter-btn" data-filter="ZERO_ROLLOVER" onclick="setFilter('ZERO_ROLLOVER')">Zero rollover</button>
         </div>
         <div class="not-checked-bar" id="notCheckedBar" style="display:none"></div>
+        <div class="not-checked-bar" id="trustGateBar" style="display:none"></div>
         <div class="table-wrapper">
           <table>
             <thead><tr>
@@ -719,6 +723,7 @@ async function runScan() {
     renderSummary(data);
     updateGhostFilter(data.ghost_enabled);
     updateNotCheckedFlags(data.flags_not_checked || []);
+    updateTrustGate(data);
     currentPage = 1;
     currentFilter = 'all';
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
@@ -770,10 +775,60 @@ function showResults() {
 }
 
 function showError(msg) {
-  document.getElementById('errorBanner').textContent = msg;
-  document.getElementById('errorBanner').classList.add('visible');
+  const banner = document.getElementById('errorBanner');
+  const text = String(msg || '');
+  const wantsState = /state budget|not supported|scanned document|cannot parse/i.test(text);
+  let html = esc(text);
+  if (wantsState) {
+    html += `<div style="margin-top:12px;font-size:13px">
+      Which state were you trying to upload?
+      <input id="interestState" placeholder="e.g. Kano" style="margin:0 8px;padding:6px 10px;border:1px solid #cbd5e0;border-radius:8px">
+      <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:12px" onclick="submitFormatInterest()">Tell us</button>
+      <span id="interestThanks" style="margin-left:8px;color:var(--ink-600)"></span>
+    </div>`;
+  }
+  banner.innerHTML = html;
+  banner.classList.add('visible');
 }
 function hideError() { document.getElementById('errorBanner').classList.remove('visible'); }
+
+async function submitFormatInterest() {
+  const state = (document.getElementById('interestState') || {}).value || '';
+  const form = new FormData();
+  form.append('state', state);
+  if (selectedFiles[0]) form.append('filename', selectedFiles[0].file.name);
+  try {
+    const res = await fetch('/format-interest', { method: 'POST', body: form });
+    const data = await res.json();
+    const el = document.getElementById('interestThanks');
+    if (el) el.textContent = data.message || 'Thanks — logged.';
+  } catch (e) {
+    const el = document.getElementById('interestThanks');
+    if (el) el.textContent = 'Could not send — try again later.';
+  }
+}
+
+function updateTrustGate(d) {
+  const bar = document.getElementById('trustGateBar');
+  if (!bar) return;
+  const parts = [];
+  if (d.provisional || (d.trust_gate && d.trust_gate.provisional)) {
+    const warnings = (d.trust_gate && d.trust_gate.warnings) || [
+      'Results are provisional / low-confidence for this format.',
+    ];
+    parts.push('<strong>Provisional scan:</strong> ' + warnings.map(esc).join(' · '));
+  }
+  if (d.mandates_reviewed === false || (d.trust_gate && d.trust_gate.mandates_reviewed === false)) {
+    parts.push('<strong>Mandates unreviewed:</strong> mandate mismatches are capped at MEDIUM until a human reviews the scope file.');
+  }
+  if (!parts.length) {
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+    return;
+  }
+  bar.style.display = 'block';
+  bar.innerHTML = parts.join('<br>');
+}
 
 function renderSummary(d) {
   document.getElementById('sumHigh').textContent = d.high_risk || 0;

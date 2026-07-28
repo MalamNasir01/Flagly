@@ -120,14 +120,54 @@ VAGUE_LOCATION_PHRASE_RECORDS = _normalize_vague_phrases(_load_json('vague_locat
 VAGUE_LOCATION_PHRASES = [r['phrase'] for r in VAGUE_LOCATION_PHRASE_RECORDS]
 VAGUE_PHRASE_SEVERITY = {r['phrase']: r.get('severity') for r in VAGUE_LOCATION_PHRASE_RECORDS}
 
+def _load_state_mandates_bundle() -> Dict[str, dict]:
+    """Load all data/mda_mandates_states*.json keyed by jurisdiction slug."""
+    data_dir = os.path.dirname(_data_path('mda_mandates.json'))
+    bundles: Dict[str, dict] = {}
+    try:
+        names = os.listdir(data_dir)
+    except Exception:
+        names = []
+    for fname in sorted(names):
+        if not fname.startswith('mda_mandates_states') or not fname.endswith('.json'):
+            continue
+        path = os.path.join(data_dir, fname)
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                doc = json.load(f)
+        except Exception as e:
+            print(f'[flags] could not load {fname}: {e}')
+            continue
+        meta = doc.get('_meta') or {}
+        jurisdiction = meta.get('jurisdiction') or ''
+        if not jurisdiction:
+            if fname == 'mda_mandates_states.json':
+                jurisdiction = 'niger_state'
+            else:
+                slug = fname.replace('mda_mandates_states_', '').replace('.json', '')
+                jurisdiction = f'{slug}_state' if not slug.endswith('_state') else slug
+        # reviewed missing on legacy niger file ⇒ True (already shipped)
+        reviewed = meta['reviewed'] if 'reviewed' in meta else True
+        bundles[jurisdiction] = {
+            'mandates': _normalize_mda_mandates(doc),
+            'reviewed': bool(reviewed),
+            'meta': meta,
+            'path': path,
+        }
+    return bundles
+
+
 MDA_MANDATES = _normalize_mda_mandates(_load_json('mda_mandates.json', {}))
-STATE_MDA_MANDATES = _normalize_mda_mandates(_load_json('mda_mandates_states.json', {}))
+STATE_MANDATE_BUNDLES = _load_state_mandates_bundle()
+STATE_MDA_MANDATES = (STATE_MANDATE_BUNDLES.get('niger_state') or {}).get('mandates') or {}
 # Active mandate table — swapped per run_all_flags(jurisdiction=...)
 ACTIVE_MDA_MANDATES = MDA_MANDATES
+ACTIVE_MANDATES_REVIEWED = True
 NIGERIA_GEO = _load_json('nigeria_states_lgas.json', {'states': []})
 print(
     f"[flags] loaded {len(MDA_MANDATES)} federal MDA mandates, "
-    f"{len(STATE_MDA_MANDATES)} state MDA mandates, "
+    f"{sum(len(b['mandates']) for b in STATE_MANDATE_BUNDLES.values())} state MDA mandates "
+    f"across {len(STATE_MANDATE_BUNDLES)} file(s), "
     f"{len(VAGUE_LOCATION_PHRASES)} vague phrases"
 )
 
@@ -1024,6 +1064,15 @@ def flag_mandate_mismatch(row: Dict) -> Optional[Dict]:
         mismatch_kind = 'not_in_scope'
         reason = 'neither in the MDA scope nor its excluded list, pending review'
 
+    # Unreviewed draft mandates: never HIGH / publishable-tier
+    if severity == 'HIGH' and not ACTIVE_MANDATES_REVIEWED:
+        severity = 'MEDIUM'
+        mismatch_kind = 'excluded_unreviewed'
+        reason = (
+            f'listed in the MDA excluded categories ({cat}), but this jurisdiction\'s '
+            'mandates file is unreviewed — capped at MEDIUM until human review'
+        )
+
     return {
         'flag_type': 'MANDATE_MISMATCH',
         'severity': severity,
@@ -1041,6 +1090,7 @@ def flag_mandate_mismatch(row: Dict) -> Optional[Dict]:
             'project_category': cat,
             'matched_keyword': matched_kw,
             'mismatch_kind': mismatch_kind,
+            'mandates_reviewed': ACTIVE_MANDATES_REVIEWED,
         },
     }
 
@@ -1398,10 +1448,29 @@ def run_all_flags(
     """
     from engines.classifier import classify_with_match
 
-    global LAST_RUN_STATS, ACTIVE_MDA_MANDATES
+    global LAST_RUN_STATS, ACTIVE_MDA_MANDATES, ACTIVE_MANDATES_REVIEWED
 
     is_state = str(jurisdiction or '').startswith('state')
-    ACTIVE_MDA_MANDATES = STATE_MDA_MANDATES if is_state else MDA_MANDATES
+    if is_state:
+        # jurisdiction may be state_niger / state_kaduna / niger_state / kaduna_state
+        jkey = str(jurisdiction)
+        candidates = [jkey]
+        if jkey.startswith('state_'):
+            candidates.append(jkey[len('state_'):] + '_state')
+        elif jkey.endswith('_state'):
+            candidates.append('state_' + jkey[: -len('_state')])
+        bundle = None
+        for key in candidates:
+            bundle = STATE_MANDATE_BUNDLES.get(key)
+            if bundle:
+                break
+        if bundle is None and 'niger' in jkey:
+            bundle = STATE_MANDATE_BUNDLES.get('niger_state')
+        ACTIVE_MDA_MANDATES = (bundle or {}).get('mandates') or STATE_MDA_MANDATES
+        ACTIVE_MANDATES_REVIEWED = bool((bundle or {}).get('reviewed', True))
+    else:
+        ACTIVE_MDA_MANDATES = MDA_MANDATES
+        ACTIVE_MANDATES_REVIEWED = True
 
     rows = df.to_dict('records')
 
@@ -1420,6 +1489,7 @@ def run_all_flags(
         'unclassified_count': unclassified,
         'flagged_items': 0,
         'jurisdiction': jurisdiction,
+        'mandates_reviewed': ACTIVE_MANDATES_REVIEWED,
     }
     if unclassified:
         print(f"[flags] unclassified lines: {unclassified} of {len(rows)} "

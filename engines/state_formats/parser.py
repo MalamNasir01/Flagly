@@ -219,22 +219,21 @@ def _is_right_column_noise(line: str, profile: dict) -> bool:
 
 
 def _profiles_dir() -> str:
-    return os.path.join(os.path.dirname(__file__), "profiles")
+    from engines.state_formats.registry import profiles_dir
+
+    return profiles_dir()
 
 
 def load_profile(profile_id: str) -> dict:
-    mapping = {
-        "state_niger": "niger_v1.json",
-        "niger_v1": "niger_v1.json",
-    }
-    filename = mapping.get(profile_id, f"{profile_id}.json")
-    path = os.path.join(_profiles_dir(), filename)
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    from engines.state_formats.registry import load_profile as _reg_load
+
+    return _reg_load(profile_id)
 
 
 def list_profiles() -> List[str]:
-    return ["state_niger"]
+    from engines.state_formats.registry import list_profiles as _reg_list
+
+    return _reg_list()
 
 
 def _detect_columns_present(header_blob: str, profile: dict) -> List[str]:
@@ -352,33 +351,50 @@ def _parse_location(line: str) -> Tuple[Optional[str], Optional[str]]:
     return code, name or None
 
 
-def _parse_yoy_amounts(line: str, location_end: int = 0) -> Dict[str, Optional[float]]:
+def _parse_yoy_amounts(
+    line: str,
+    location_end: int = 0,
+    *,
+    amount_token_index: Optional[int] = None,
+) -> Dict[str, Optional[float]]:
     region = line[location_end:] if location_end else line
-    # Prefer the amount region after the location match
     loc = LOCATION_ON_LINE_RE.search(line)
     if loc:
         region = line[loc.end() :]
     tokens = AMOUNT_TOKEN_RE.findall(region)
-    # Keep at most the last 4 amount-like tokens (YoY block)
-    tokens = tokens[-4:] if len(tokens) > 4 else tokens
 
     def tok(v: str) -> Optional[float]:
         if v == "-":
             return None
         return _to_float(v)
 
+    # Default / negative index: Niger-style — last 4 tokens, left-pad, last = approved
+    if amount_token_index is None or amount_token_index < 0:
+        window = tokens[-4:] if len(tokens) > 4 else tokens
+        vals = [tok(t) for t in window]
+        while len(vals) < 4:
+            vals.insert(0, None)
+        if len(vals) > 4:
+            vals = vals[-4:]
+        return {
+            "actuals_2024": vals[0],
+            "budget_2025": vals[1],
+            "performance_2025": vals[2],
+            "budget_2026": vals[3],
+            "amount": vals[3],
+        }
+
+    # Explicit 0-based index among tokens after location (Kaduna sector tables)
     vals = [tok(t) for t in tokens]
-    # Pad on the left so the last slot is always approved_2026 when <4 tokens
-    while len(vals) < 4:
-        vals.insert(0, None)
-    if len(vals) > 4:
-        vals = vals[-4:]
+    while len(vals) <= amount_token_index:
+        vals.append(None)
+    amount = vals[amount_token_index]
     return {
-        "actuals_2024": vals[0],
-        "budget_2025": vals[1],
-        "performance_2025": vals[2],
-        "budget_2026": vals[3],
-        "amount": vals[3],
+        "actuals_2024": vals[0] if len(vals) > 0 else None,
+        "budget_2025": amount,
+        "performance_2025": vals[2] if len(vals) > 2 else None,
+        "budget_2026": amount,
+        "amount": amount,
     }
 
 
@@ -483,6 +499,19 @@ def description_merge_issues(description: str) -> List[str]:
     ):
         issues.append("mid_phrase_start")
 
+    # Collapse compound construction phrases so "Upgrading, Renovation and
+    # Reconstruction of X" is one act, not three merged projects.
+    normalized = re.sub(
+        r"\b(?:Upgrading|Upgrade|Renovation|Remodelling|Remodeling|Reconstruction|"
+        r"Rehabilitation|Repairs)"
+        r"(?:\s*,\s*|\s+and\s+)(?:Upgrading|Upgrade|Renovation|Remodelling|"
+        r"Remodeling|Reconstruction|Rehabilitation|Repairs|"
+        r"Reconstrunction|Expantion|Expansion)+",
+        "Reconstruction",
+        desc,
+        flags=re.I,
+    )
+
     # Second project-title head: Capitalized "Verb of …" / "Erosion Control …"
     # after a substantial first title. Optional list marker (i. / ii.) allowed.
     second = re.search(
@@ -495,12 +524,12 @@ def description_merge_issues(description: str) -> List[str]:
         r"Equipping|Building|Fencing|Repairs)\s+of"
         r"|Erosion\s+Control"
         r")\b",
-        desc,
+        normalized,
     )
     if second:
         # Ignore object-of-preposition noun uses: "for Development of", "the Production of"
         start = second.start()
-        window = desc[max(0, start - 12) : start + 1].lower()
+        window = normalized[max(0, start - 12) : start + 1].lower()
         if not re.search(r"\b(?:for|of|the|and|to|in|by)\s+$", window):
             issues.append("multiple_project_verbs")
     return issues
@@ -537,19 +566,49 @@ def parse_capital_section(text: str, profile: dict) -> Tuple[List[dict], dict]:
         when a new left-column project title appears.
       - Title wraps start with lowercase / and|of|within… or sit under the
         project column without a new verb head.
+      - Multiple start markers are supported (sector tables); each resets
+        pending title/admin carry state.
     """
+    global LOCATION_ON_LINE_RE
+
     starts = (profile.get("section_markers") or {}).get("start") or [
         "Capital Expenditure by Project"
     ]
     stops = (profile.get("section_markers") or {}).get("stop") or []
+    amount_token_index = profile.get("amount_token_index")
+    # Do not infer from column name — Niger uses approved_2026 with default last-token layout.
 
+    # Profile-driven location code pattern (Niger 12xxxxxx, Kaduna 31xxxxxx, …)
+    old_loc_re = LOCATION_ON_LINE_RE
+    loc_pat = (profile.get("patterns") or {}).get("location_code")
+    if loc_pat:
+        if "(?=" not in loc_pat:
+            loc_pat = loc_pat + r"(?=\s{2,}|\s+[\d,]|\s+-|\s*$)"
+        LOCATION_ON_LINE_RE = re.compile(loc_pat)
+
+    try:
+        return _parse_capital_section_body(
+            text,
+            profile,
+            starts=starts,
+            stops=stops,
+            amount_token_index=amount_token_index,
+        )
+    finally:
+        LOCATION_ON_LINE_RE = old_loc_re
+
+
+def _parse_capital_section_body(
+    text: str,
+    profile: dict,
+    *,
+    starts: List[str],
+    stops: List[str],
+    amount_token_index: Optional[int],
+) -> Tuple[List[dict], dict]:
     lines = text.splitlines()
-    start_idx = None
-    for i, line in enumerate(lines):
-        if any(s in line for s in starts):
-            start_idx = i
-            break
-    if start_idx is None:
+    start_indices = [i for i, line in enumerate(lines) if any(s in line for s in starts)]
+    if not start_indices:
         return [], {
             "columns_detected": [],
             "amount_column_used": None,
@@ -557,13 +616,13 @@ def parse_capital_section(text: str, profile: dict) -> Tuple[List[dict], dict]:
             "error": "Capital Expenditure by Project section not found",
         }
 
+    start_idx = start_indices[0]
     header_blob = "\n".join(lines[start_idx : start_idx + 15])
     columns_detected = _detect_columns_present(header_blob, profile)
     amount_col = profile.get("amount_column") or "approved_2026"
 
     rows: List[dict] = []
     pending_desc: List[str] = []
-    # Admin carried from a prior line that had 12-digit code but no location yet
     pending_admin: Optional[Dict[str, Any]] = None
 
     def _emit(desc_parts, mda_code, mda_name, loc_code, loc_name, yoy, eco_code):
@@ -598,6 +657,8 @@ def parse_capital_section(text: str, profile: dict) -> Tuple[List[dict], dict]:
     while i < len(lines):
         line = lines[i]
         if any(s in line for s in starts):
+            pending_desc = []
+            pending_admin = None
             i += 1
             continue
         if any(s in line for s in stops):
@@ -632,7 +693,11 @@ def parse_capital_section(text: str, profile: dict) -> Tuple[List[dict], dict]:
             }
 
         loc_code, loc_name = _parse_location(line) if has_loc else (None, None)
-        yoy = _parse_yoy_amounts(line) if has_loc else None
+        yoy = (
+            _parse_yoy_amounts(line, amount_token_index=amount_token_index)
+            if has_loc
+            else None
+        )
 
         # Effective admin: same-line, or carried forward from a nearby admin-only line
         mda_code = mda_name = None
@@ -653,7 +718,6 @@ def parse_capital_section(text: str, profile: dict) -> Tuple[List[dict], dict]:
                 consume_pending = True
             elif pending_desc:
                 p0 = pending_desc[0].strip()
-                # Only glue wrap-tails onto the previous row; hold real titles
                 if _CONTINUATION_START_RE.match(p0) or (p0[:1].islower() if p0 else False):
                     _attach_orphan_pending_to_last(rows, pending_desc)
                     consume_pending = True
@@ -672,7 +736,6 @@ def parse_capital_section(text: str, profile: dict) -> Tuple[List[dict], dict]:
                 "amount": None,
             }
 
-            # Peek ONLY true wraps — stop at next project title / next structural row
             j = i + 1
             while j < len(lines):
                 nxt = lines[j]
@@ -685,10 +748,8 @@ def parse_capital_section(text: str, profile: dict) -> Tuple[List[dict], dict]:
                 if nxt_admin and nxt_loc:
                     break
                 if nxt_loc and not nxt_admin:
-                    # Next location row = next project (admin may be carried)
                     break
                 if nxt_admin and not nxt_loc:
-                    # Admin-only prelude of the next project
                     break
                 if _is_mda_name_wrap_line(nxt):
                     wrap = nxt.strip()
@@ -705,8 +766,6 @@ def parse_capital_section(text: str, profile: dict) -> Tuple[List[dict], dict]:
                     continue
                 if _looks_like_new_project_title(nxt):
                     break
-                # Capitalized orphan titles are a new project unless the current
-                # title clearly continues mid-phrase onto the next line.
                 if _looks_like_orphan_project_title(nxt) and not _title_looks_incomplete(
                     " ".join(desc_parts)
                 ):
@@ -726,13 +785,11 @@ def parse_capital_section(text: str, profile: dict) -> Tuple[List[dict], dict]:
                 break
 
             _emit(desc_parts, mda_code, mda_name, loc_code, loc_name, yoy, eco_code)
-            # Keep admin context for immediately following title wraps of same MDA
             if pending_admin and pending_admin.get("code") == mda_code:
                 pending_admin["name"] = mda_name or pending_admin.get("name")
             i = j
             continue
 
-        # Non-anchor: accumulate project-title lines until the structural row
         if _is_fragment_line(line, profile):
             i += 1
             continue
@@ -742,7 +799,6 @@ def parse_capital_section(text: str, profile: dict) -> Tuple[List[dict], dict]:
         left = _left_text_before_admin(line)
         if left and not FRAGMENT_LEFT_RE.match(left) and not ECONOMIC_ON_LINE_RE.match(left.strip()):
             if _looks_like_orphan_project_title(line) or _looks_like_new_project_title(line):
-                # If we still have an unused wrap-tail, attach it to the last row first
                 if pending_desc and rows and (
                     _CONTINUATION_START_RE.match(pending_desc[0].strip())
                     or pending_desc[0].strip()[:1].islower()
@@ -757,7 +813,6 @@ def parse_capital_section(text: str, profile: dict) -> Tuple[List[dict], dict]:
                 pending_desc.append(left)
         i += 1
 
-    # Trailing wrap after last emit
     if pending_desc:
         _attach_orphan_pending_to_last(rows, pending_desc)
 
@@ -765,14 +820,19 @@ def parse_capital_section(text: str, profile: dict) -> Tuple[List[dict], dict]:
         "section_found": True,
         "columns_detected": columns_detected,
         "amount_column_used": amount_col,
-        "amount_column_label": "2026 Approved Budget",
+        "amount_column_label": {
+            "approved_2026": "2026 Approved Budget",
+            "approved_2025": "2025 Approved Budget",
+        }.get(amount_col, amount_col),
         "rows_parsed": len(rows),
         "profile_id": profile.get("id"),
         "jurisdiction": profile.get("jurisdiction"),
+        "sections_matched": len(start_indices),
     }
     quality = assess_parse_quality(rows)
     meta["parse_quality"] = quality
     return rows, meta
+
 
 
 def parse_state_pdf(contents: bytes, profile_id: str = "state_niger") -> Tuple[pd.DataFrame, dict]:

@@ -1,0 +1,69 @@
+{
+  "id": "state_kaduna",
+  "jurisdiction": "kaduna_state",
+  "label": "Kaduna State Approved Budget",
+  "version": "1.0",
+  "detection": {
+    "required_phrases_any": [
+      "Kaduna State Government",
+      "KADUNA STATE GOVERNMENT"
+    ],
+    "supporting_phrases_any": [
+      "Approved Budget",
+      "APPROVED",
+      "Capital Expenditure by Project",
+      "2025 Approved Budget"
+    ],
+    "admin_code_re": "\\b\\d{12}\\b",
+    "location_code_re": "\\b31[0-9]{6}\\s*-\\s*[A-Z]{2,}",
+    "min_location_hits_on_page": 3,
+    "sample_pages": 100
+  },
+  "section_markers": {
+    "start": [
+      "Basic Education Capital Expenditure by Project",
+      "Primary Health Capital Expenditure by Project"
+    ],
+    "stop": [
+      "Approved Budget - Capital Expenditure by Project",
+      "Budget Glossary",
+      "Programme Code and Programme Description",
+      "Recurrent Expenditure by Administrative"
+    ],
+    "notes": "v1 parses the clean sector capital-by-project tables only. The full 'Capital Expenditure by Project' sheet in this PDF is Excel-wrap garbled and excluded until a layout-specific pass."
+  },
+  "columns": [
+    {"id": "project_name", "header_fragments": ["Project Name"]},
+    {"id": "administrative", "header_fragments": ["Administrative Code and Description", "Administrative Code"]},
+    {"id": "economic", "header_fragments": ["Economic Code and Description", "Economic Code"]},
+    {"id": "location", "header_fragments": ["Location Code and Description", "Location Code"]},
+    {"id": "performance_2024", "header_fragments": ["2024 Performance", "Performance January"]},
+    {"id": "approved_2025", "header_fragments": ["2025 Approved Budget"]}
+  ],
+  "amount_column": "approved_2025",
+  "amount_token_index": 1,
+  "patterns": {
+    "admin_code": "(\\d{12})\\s*-\\s*",
+    "location_code": "(\\d{8})\\s*-\\s*([A-Z][A-Z\\s/&.-]{2,})",
+    "economic_code": "(2[123]\\d{6})\\s*-"
+  },
+  "row_rules": {
+    "skip_line_prefixes": [
+      "Total Capital",
+      "Total ",
+      "Project Name",
+      "Kaduna State Government"
+    ],
+    "fragment_reject_words": [
+      "OFFICE BUILDINGS",
+      "RESIDENTIAL BUILDING",
+      "ORGANS",
+      "HOUSING",
+      "EQUIPMENT",
+      "AND FITTINGS",
+      "BUILDINGS",
+      "SET",
+      "PUBLIC SCHOOLS"
+    ]
+  }
+}

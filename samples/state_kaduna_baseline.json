@@ -1,0 +1,135 @@
+{
+  "jurisdiction": "kaduna_state",
+  "profile_id": "state_kaduna",
+  "note": "Kaduna v1: Basic Education + Primary Health capital-by-project tables. Full capital sheet excluded (Excel wrap). Mandates reviewed=false \u2192 MEDIUM-capped. Federal/Niger baselines unchanged.",
+  "total_items": 259,
+  "amount_non_null_pct": 3.86,
+  "flagged_items": 4,
+  "mandate_high": 0,
+  "mandate_medium": 1,
+  "flag_counts": {
+    "CONTEXT_MISMATCH": 1,
+    "VAGUE_LOCATION": 1,
+    "MANDATE_MISMATCH": 1,
+    "BLANK_APPROVED_AMOUNT": 2,
+    "COMPOSITE_DUPLICATE": 2
+  },
+  "parse_quality": {
+    "rows_checked": 259,
+    "suspect_rows": 1,
+    "examples": [
+      {
+        "index": 258,
+        "issues": [
+          "multiple_project_verbs"
+        ],
+        "description": "Procurement of Drugs for MNCH Week - Purchase of Health/Medical",
+        "amount": null
+      }
+    ]
+  },
+  "mandates_reviewed": false,
+  "trust_gate": {
+    "publishable": true,
+    "provisional": false,
+    "confidence": "high",
+    "has_baseline": true,
+    "parse_quality_clean": true,
+    "mandates_reviewed": false,
+    "max_severity": "MEDIUM",
+    "warnings": [
+      "MDA mandates are unreviewed \u2014 mandate mismatches are capped at MEDIUM and are not publishable-tier."
+    ]
+  },
+  "top10_by_amount": [
+    {
+      "rank": 1,
+      "description": "UBEC Intervention on Infrastructure",
+      "amount": 18120849419.19,
+      "mda": "State Universal Basic Education Board (SUBEB)",
+      "location": "State Wide",
+      "merge_issues": []
+    },
+    {
+      "rank": 2,
+      "description": "Primary Education Development Projects",
+      "amount": 8537816377.84,
+      "mda": "State Universal Basic Education Board (SUBEB)",
+      "location": "State Wide",
+      "merge_issues": []
+    },
+    {
+      "rank": 3,
+      "description": "Remodelling, Reconstrunction and Expantion of Primary Health Care Board HQ, including Consultancy Services",
+      "amount": 5872150090.07,
+      "mda": "Kaduna State Primary Health Care Board",
+      "location": "State Wide",
+      "merge_issues": []
+    },
+    {
+      "rank": 4,
+      "description": "Better Education Service Delivery for All (BESDA)",
+      "amount": 5837860532.5,
+      "mda": "State Universal Basic Education Board (SUBEB) Description",
+      "location": "State Wide",
+      "merge_issues": []
+    },
+    {
+      "rank": 5,
+      "description": "Teaching Aids/Instructional Materials for Junior Secondary Schools",
+      "amount": 2805995100.0,
+      "mda": "Ministry of Education",
+      "location": "State Wide",
+      "merge_issues": []
+    },
+    {
+      "rank": 6,
+      "description": "State Intervention on SBMC/SIP",
+      "amount": 707740500.0,
+      "mda": "State Universal Basic Education Board (SUBEB)",
+      "location": "State Wide",
+      "merge_issues": []
+    },
+    {
+      "rank": 7,
+      "description": "Maintenace of Medical Equipments in 255 PHCs IMPACT Project and BHCPF{25%}, FP Commodities by UNFPA etc",
+      "amount": 655000000.0,
+      "mda": "Kaduna State Primary Health Care Board",
+      "location": "State Wide",
+      "merge_issues": []
+    },
+    {
+      "rank": 8,
+      "description": "Construction of Incinerators in the 3 geo-political zones",
+      "amount": 217350000.0,
+      "mda": "Kaduna State Primary Health Care Board",
+      "location": "State Wide",
+      "merge_issues": []
+    },
+    {
+      "rank": 9,
+      "description": "Repairs and Preventive Maintenance of Solar systems for 34Nos Solar Clinics in the PHCs across the state",
+      "amount": 187000000.0,
+      "mda": "Kaduna State Primary Health Care Board",
+      "location": "State Wide",
+      "merge_issues": []
+    },
+    {
+      "rank": 10,
+      "description": "UBEC Intervention on Teacher Professional Development",
+      "amount": 140700000.0,
+      "mda": "State Universal Basic Education Board (SUBEB)",
+      "location": "State Wide",
+      "merge_issues": []
+    }
+  ],
+  "columns_detected": [
+    "project_name",
+    "administrative",
+    "economic",
+    "location",
+    "performance_2024",
+    "approved_2025"
+  ],
+  "amount_column_used": "approved_2025"
+}

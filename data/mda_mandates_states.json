@@ -3,8 +3,9 @@
     "purpose": "Niger State MDA scope map for mandate-mismatch on state_niger scans. Same schema as federal mda_mandates.json.",
     "version": "0.1",
     "jurisdiction": "niger_state",
-    "last_updated": "2026-07-27",
-    "notes": "Built from MDAs observed in the parsed Niger State 2026 Capital Expenditure by Project extract. Do not invent MDAs. Scopes inferred from MDA names; expand before newsroom use. category_vocabulary shared with federal file.",
+    "reviewed": true,
+    "last_updated": "2026-07-28",
+    "notes": "Built from MDAs observed in the parsed Niger State 2026 Capital Expenditure by Project extract. reviewed=true after human scope review. category_vocabulary shared with federal file.",
     "category_vocabulary": [
       "roads",
       "road_maintenance",

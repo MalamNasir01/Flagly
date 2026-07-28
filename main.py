@@ -11,7 +11,11 @@ from fastapi.staticfiles import StaticFiles
 import pandas as pd
 
 from engines.parser import parse_file
-from engines.format_detect import UnsupportedBudgetFormat, FORMAT_STATE_NIGER
+from engines.format_detect import UnsupportedBudgetFormat, FORMAT_STATE_NIGER, supported_format_catalog
+from engines.state_formats.trust_gate import evaluate_trust_gate, apply_severity_cap
+from engines.state_formats.registry import load_profile
+from engines.flags import get_last_run_stats, ACTIVE_MANDATES_REVIEWED
+import engines.flags as flags_mod
 from engines.flags import run_all_flags, flag_ghost_projects_multiyear, get_last_run_stats
 from engines.scorer import score_items
 from engines.query import generate_narratives, answer_question, visuals_payload, safe_float
@@ -147,22 +151,58 @@ def summarize_scan(df: pd.DataFrame, results: List[Dict]) -> Dict[str, Any]:
     }
 
 
+def _jurisdiction_for_format(budget_format: str) -> str:
+    if not budget_format or budget_format == "federal_fgn":
+        return "federal"
+    if budget_format.startswith("state_"):
+        return budget_format
+    try:
+        profile = load_profile(budget_format)
+        j = profile.get("jurisdiction") or budget_format
+        if j and not str(j).startswith("state"):
+            # kaduna_state → keep; also accept state_kaduna from profile id
+            return str(j)
+        return str(j)
+    except Exception:
+        return budget_format
+
+
 def process_single(contents: bytes, filename: str, budget_year: str) -> Dict[str, Any]:
     try:
         df = parse_file(contents, filename)
     except UnsupportedBudgetFormat as e:
+        # Structured refusal — never emit an n/a-filled report
         raise ValueError(str(e)) from e
     if df is None or df.empty:
         raise ValueError("Could not extract any data from the uploaded file. Please check the format.")
 
     budget_format = df.attrs.get("budget_format") or "federal_fgn"
     parse_meta = df.attrs.get("parse_meta") or {}
-    jurisdiction = (
-        "state_niger" if budget_format == FORMAT_STATE_NIGER else "federal"
-    )
+    jurisdiction = _jurisdiction_for_format(budget_format)
 
     flagged_rows = run_all_flags(df, budget_year=budget_year, jurisdiction=jurisdiction)
     scored = score_items(flagged_rows) if flagged_rows else []
+
+    # Trust gate for state formats
+    trust = {
+        "publishable": True,
+        "provisional": False,
+        "confidence": "high",
+        "has_baseline": True,
+        "parse_quality_clean": True,
+        "mandates_reviewed": True,
+        "max_severity": "HIGH",
+        "warnings": [],
+    }
+    if str(jurisdiction).startswith("state") or str(budget_format).startswith("state_"):
+        mandates_reviewed = bool(flags_mod.ACTIVE_MANDATES_REVIEWED)
+        trust = evaluate_trust_gate(
+            profile_id=budget_format,
+            parse_meta=parse_meta,
+            mandates_reviewed=mandates_reviewed,
+        )
+        scored = apply_severity_cap(scored, trust["max_severity"])
+
     out = summarize_scan(df, scored)
     out["budget_year"] = budget_year
     out["filename"] = filename
@@ -170,18 +210,57 @@ def process_single(contents: bytes, filename: str, budget_year: str) -> Dict[str
     out["parse_meta"] = parse_meta
     out["jurisdiction"] = jurisdiction
     out["parse_only"] = False
+    out["trust_gate"] = trust
+    out["mandates_reviewed"] = trust.get("mandates_reviewed", True)
+    out["provisional"] = trust.get("provisional", False)
     out["narratives"] = generate_narratives(scored)
     out["visuals"] = visuals_payload(scored)
     out["multi_year"] = False
     out["ghost_enabled"] = False
-    # Null-2026 rows remain in total_items; blank-approved flag keeps them visible when anomalous
     out["null_approved_amount_count"] = int(df["amount"].isna().sum()) if "amount" in df.columns else 0
     stats = get_last_run_stats()
     out["blank_approved_amount"] = stats.get("blank_approved_amount") or {
         "total": 0, "low": 0, "medium": 0, "informational_only_excluded": 0,
     }
     out["flags_not_checked"] = stats.get("flags_not_checked") or []
+    out["supported_formats"] = supported_format_catalog()
     return out
+
+
+@app.get("/health")
+async def health():
+    return JSONResponse(
+        content={
+            "status": "ok",
+            "supported_formats": supported_format_catalog(),
+        }
+    )
+
+
+@app.post("/format-interest")
+async def format_interest(
+    state: Optional[str] = Form(None),
+    note: Optional[str] = Form(None),
+    filename: Optional[str] = Form(None),
+):
+    """Capture demand signal when a user wanted an unsupported state format."""
+    payload = {
+        "state": (state or "").strip() or None,
+        "note": (note or "").strip() or None,
+        "filename": (filename or "").strip() or None,
+    }
+    print(f"[format-interest] {payload}")
+    return JSONResponse(
+        content={
+            "ok": True,
+            "message": (
+                "Thanks — we logged your request. Flagly currently supports "
+                + ", ".join(c["label"] for c in supported_format_catalog())
+                + "."
+            ),
+            "supported_formats": supported_format_catalog(),
+        }
+    )
 
 
 @app.get("/")
@@ -195,12 +274,6 @@ async def root():
 async def favicon():
     from fastapi.responses import FileResponse
     return FileResponse("frontend/assets/favicon.ico", media_type="image/x-icon")
-
-
-@app.get("/health")
-async def health():
-    return JSONResponse(content={"status": "ok"})
-
 
 @app.post("/scan")
 async def scan(
@@ -274,12 +347,12 @@ async def scan(
                 return json_response({"error": str(e)}, status_code=400)
             if df is None or df.empty:
                 continue
-            if df.attrs.get("budget_format") == FORMAT_STATE_NIGER:
+            if str(df.attrs.get("budget_format") or "").startswith("state_"):
                 return json_response(
                     {
                         "error": (
                             "Multi-year scanning is not available for state budgets yet. "
-                            "Upload a single Niger State file for parse-only verification."
+                            "Upload a single state file for a full scan."
                         )
                     },
                     status_code=400,

@@ -98,33 +98,38 @@ def _to_float(val):
 def parse_file(contents: bytes, filename: str) -> Optional[pd.DataFrame]:
     """Auto-detect file type and budget format, then dispatch.
 
-    Supported PDF formats: federal_fgn (Format A/C), state_niger (profile).
+    Supported PDF formats: federal_fgn and any registered state profile.
     Raises UnsupportedBudgetFormat when the layout is not recognized.
     Attaches df.attrs['budget_format'] and df.attrs['parse_meta'] when present.
     """
     from engines.format_detect import (
         FORMAT_FEDERAL,
-        FORMAT_STATE_NIGER,
+        FORMAT_SCANNED,
+        FORMAT_KNOWN_UNSUPPORTED,
         FORMAT_UNKNOWN,
         UnsupportedBudgetFormat,
-        detect_budget_format,
+        classify_budget_file,
+        supported_formats,
     )
 
     try:
         name_lower = filename.lower()
         if name_lower.endswith('.pdf'):
-            fmt = detect_budget_format(contents)
-            print(f"[diag] budget_format={fmt}")
-            if fmt == FORMAT_UNKNOWN:
-                raise UnsupportedBudgetFormat()
-            if fmt == FORMAT_STATE_NIGER:
+            detection = classify_budget_file(contents)
+            fmt = detection.format_id
+            print(f"[diag] budget_format={fmt} supported={detection.supported}")
+            if not detection.supported:
+                raise UnsupportedBudgetFormat(detection=detection)
+            if fmt == FORMAT_FEDERAL:
+                return _parse_pdf_federal(contents)
+            # Any registered state profile id
+            if fmt in supported_formats() and fmt != FORMAT_FEDERAL:
                 from engines.state_formats import parse_state_pdf
-                df, meta = parse_state_pdf(contents, "state_niger")
-                df.attrs["budget_format"] = FORMAT_STATE_NIGER
+                df, meta = parse_state_pdf(contents, fmt)
+                df.attrs["budget_format"] = fmt
                 df.attrs["parse_meta"] = meta
                 return df
-            # federal_fgn — existing Format C then A (Format B no longer routed)
-            return _parse_pdf_federal(contents)
+            raise UnsupportedBudgetFormat(detection=detection)
         elif name_lower.endswith('.xlsx') or name_lower.endswith('.xls'):
             df = _parse_excel(contents, filename)
             df.attrs["budget_format"] = FORMAT_FEDERAL
@@ -135,16 +140,19 @@ def parse_file(contents: bytes, filename: str) -> Optional[pd.DataFrame]:
             return df
         else:
             try:
-                fmt = detect_budget_format(contents)
-                if fmt == FORMAT_STATE_NIGER:
-                    from engines.state_formats import parse_state_pdf
-                    df, meta = parse_state_pdf(contents, "state_niger")
-                    df.attrs["budget_format"] = FORMAT_STATE_NIGER
-                    df.attrs["parse_meta"] = meta
-                    return df
+                detection = classify_budget_file(contents)
+                fmt = detection.format_id
+                if not detection.supported:
+                    raise UnsupportedBudgetFormat(detection=detection)
                 if fmt == FORMAT_FEDERAL:
                     return _parse_pdf_federal(contents)
-                raise UnsupportedBudgetFormat()
+                if fmt in supported_formats():
+                    from engines.state_formats import parse_state_pdf
+                    df, meta = parse_state_pdf(contents, fmt)
+                    df.attrs["budget_format"] = fmt
+                    df.attrs["parse_meta"] = meta
+                    return df
+                raise UnsupportedBudgetFormat(detection=detection)
             except UnsupportedBudgetFormat:
                 raise
             except Exception:

@@ -1,0 +1,166 @@
+{
+  "_meta": {
+    "purpose": "Draft MDA scope map for kaduna_state mandate-mismatch. Auto-generated from parsed MDA names — scopes are heuristics only.",
+    "version": "0.1-draft",
+    "jurisdiction": "kaduna_state",
+    "profile_id": "state_kaduna",
+    "reviewed": false,
+    "last_updated": "2026-07-28",
+    "notes": "reviewed=false: mandate-mismatch may fire MEDIUM only (never HIGH / publishable-tier) until a human sets reviewed=true after scope review.",
+    "category_vocabulary": [
+      "roads",
+      "road_maintenance",
+      "bridges",
+      "rail",
+      "airports",
+      "ports",
+      "water_transport",
+      "housing",
+      "urban_infrastructure",
+      "health_facilities",
+      "medical_equipment",
+      "pharmaceuticals",
+      "disease_control",
+      "primary_schools",
+      "secondary_schools",
+      "tertiary_education",
+      "vocational_training",
+      "educational_materials",
+      "agriculture_inputs",
+      "irrigation",
+      "livestock",
+      "fisheries",
+      "food_storage",
+      "water_supply",
+      "sanitation",
+      "dams",
+      "electricity_generation",
+      "electricity_distribution",
+      "renewable_energy",
+      "oil_gas",
+      "solid_minerals",
+      "ict_infrastructure",
+      "broadcasting",
+      "postal_services",
+      "financial_regulation",
+      "taxation",
+      "customs",
+      "military_equipment",
+      "policing",
+      "immigration",
+      "corrections",
+      "fire_service",
+      "disaster_response",
+      "refugee_support",
+      "social_welfare",
+      "youth_programs",
+      "sports_facilities",
+      "cultural_facilities",
+      "tourism_facilities",
+      "markets",
+      "industrial_parks",
+      "trade_facilitation",
+      "environmental_protection",
+      "climate_action",
+      "forestry",
+      "gender_programs",
+      "child_welfare",
+      "labour_programs",
+      "diplomacy",
+      "justice_administration",
+      "research_development",
+      "population_data",
+      "elections",
+      "identity_management",
+      "recurrent_admin"
+    ],
+    "source_row_count": 259,
+    "mda_count": 4
+  },
+  "mdas": [
+    {
+      "name": "Kaduna State Health Supplies Management Agency23010122",
+      "aliases": [
+        "052110200100",
+        "Kaduna State Health Supplies Management Agency23010122"
+      ],
+      "mda_code": "052110200100",
+      "scope": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "military_equipment",
+        "oil_gas",
+        "customs",
+        "immigration"
+      ]
+    },
+    {
+      "name": "Kaduna State Primary Health Care Board",
+      "aliases": [
+        "052100300100",
+        "Kaduna State Primary Health Care Board"
+      ],
+      "mda_code": "052100300100",
+      "scope": [
+        "health_facilities",
+        "medical_equipment",
+        "pharmaceuticals",
+        "disease_control",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "military_equipment",
+        "oil_gas",
+        "customs",
+        "immigration"
+      ]
+    },
+    {
+      "name": "Ministry of Education",
+      "aliases": [
+        "051700100100",
+        "Ministry of Education"
+      ],
+      "mda_code": "051700100100",
+      "scope": [
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "educational_materials",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "military_equipment",
+        "oil_gas",
+        "customs",
+        "immigration"
+      ]
+    },
+    {
+      "name": "State Universal Basic Education Board (SUBEB)",
+      "aliases": [
+        "051700300100",
+        "State Universal Basic Education Board (SUBEB)"
+      ],
+      "mda_code": "051700300100",
+      "scope": [
+        "primary_schools",
+        "secondary_schools",
+        "tertiary_education",
+        "educational_materials",
+        "recurrent_admin"
+      ],
+      "excluded": [
+        "military_equipment",
+        "oil_gas",
+        "customs",
+        "immigration"
+      ]
+    }
+  ]
+}
