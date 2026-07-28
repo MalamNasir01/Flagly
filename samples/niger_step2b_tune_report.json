@@ -1,0 +1,182 @@
+{
+  "flag_rate": 36.8333,
+  "flagged_items": 221,
+  "total_items": 6,
+  "blank_approved_amount": {
+    "total": 301,
+    "low": 301,
+    "medium": 0,
+    "informational_only_excluded": 258
+  },
+  "mandate_high": 20,
+  "mandate_medium": 154,
+  "flag_types": {
+    "INFLATED_AMOUNT": 43,
+    "MANDATE_MISMATCH": 174,
+    "CONTEXT_MISMATCH": 7,
+    "VAGUE_HIGH_VALUE_SPEND": 3,
+    "PHANTOM_SPENDING": 3,
+    "BUDGET_SPLITTING": 4,
+    "VAGUE_LOCATION": 2,
+    "BLANK_APPROVED_AMOUNT": 43
+  },
+  "flags_not_checked": [
+    {
+      "flag_type": "OVERHEAD_DOMINANCE",
+      "reason": "Not checked for this format \u2014 no overhead/capital MDA-level fields"
+    },
+    {
+      "flag_type": "DUPLICATE_CLUSTER",
+      "reason": "Not checked for this format \u2014 state sheets use COMPOSITE_DUPLICATE instead"
+    },
+    {
+      "flag_type": "GHOST_PROJECT",
+      "reason": "Multi-year ghost detection not checked for this format (upload multiple federal years to enable)"
+    }
+  ],
+  "scope_widenings": [
+    {
+      "mda": "State House of Assembly",
+      "added": [
+        "health_facilities",
+        "urban_infrastructure"
+      ]
+    },
+    {
+      "mda": "Ministry of Works",
+      "added": [
+        "fire_service"
+      ]
+    },
+    {
+      "mda": "State Universal Education Board-SUBEB",
+      "added": [
+        "urban_infrastructure"
+      ]
+    },
+    {
+      "mda": "Ministry of Health",
+      "added": [
+        "urban_infrastructure"
+      ]
+    },
+    {
+      "mda": "Ministry of Lands and Survey",
+      "added": [
+        "roads"
+      ]
+    }
+  ],
+  "state_wide_proof": {
+    "source": "PDF location column (code 12642600 - State Wide)",
+    "count": 287,
+    "not_a_fallback": true,
+    "empty_locations": 0,
+    "sample_parsed": [
+      {
+        "location": "State Wide",
+        "location_code": "12642600",
+        "amount": 6650000.0,
+        "mda": "Public Procurement Board",
+        "description": "iii. Purchase of Food Items for the Mainstreaming of Nutrition in Feeding Progra"
+      },
+      {
+        "location": "State Wide",
+        "location_code": "12642600",
+        "amount": 6900000.0,
+        "mda": "Public Procurement Board",
+        "description": "establishment of State Data procurement dashboard"
+      },
+      {
+        "location": "State Wide",
+        "location_code": "12642600",
+        "amount": 14350000.0,
+        "mda": "Public Procurement Board",
+        "description": "Market Survey of prices of tendered items at state rates"
+      }
+    ]
+  },
+  "composite_overmatch_examples": [
+    {
+      "mda": "Ministry of Agriculture",
+      "location": "State Wide",
+      "n": 13,
+      "key": "021500100100|23050101|12642600",
+      "descriptions": [
+        "iii. Take off on the operation of Taskforce on fake and adulterated 70482 - R & D AGRICULTURE, FORESTRY, Agrochemical FISHING AND HUNTING",
+        "i. Consultancy and Agricultural Programme/Projects",
+        "ii. Analysis of Tools on Food and Nutrition Insecurity"
+      ],
+      "amounts": [
+        NaN,
+        200000000.0,
+        50000000.0
+      ]
+    },
+    {
+      "mda": "RURAL WATER AND SANITATION",
+      "location": "RURAL WATER AND SANITATION",
+      "n": 13,
+      "key": "025210400100|23020105|10400100",
+      "descriptions": [
+        "Establishment of Data Base and Reporting System on WASH Facilities 70133 - OTHER GENERAL SERVICES AGENCY (RUWATSAN) WATER-WAYS",
+        "Procurement of 2no Drilling Rigs 70133 - OTHER GENERAL SERVICES AGENCY (RUWATSAN) WATER FACILITIES",
+        "Rehabilitation of 200no Handpumps boreholes in 25 LGAs 70161 - GENERAL PUBLIC SERVICES N.E.C. AGENCY (RUWATSAN) FACILITIES"
+      ],
+      "amounts": [
+        NaN,
+        NaN,
+        NaN
+      ]
+    },
+    {
+      "mda": "Niger State Planning Commission",
+      "location": "CHANCHAGA",
+      "n": 10,
+      "key": "023800100100|23050101|12621600",
+      "descriptions": [
+        "ii. NUT.6.Coordination.Activity 1: Quarterly Nutrition Coordination 70132 - OVERALL PLANNING AND Meeting (SCFN) - UNICEF/BMGF STATISTICAL SERVICES",
+        "and Skills Among Vulnerable Children STATISTICAL SERVICES Streghtening finacial and Human resource management in Basic 70132 - OVERALL PLANNING AND",
+        "Education in Primary Health Care Sectors(HOPE-GOV)(WORLD BANK) STATISTICAL SERVICES"
+      ],
+      "amounts": [
+        1500000000.0,
+        509400000.0,
+        435550000.0
+      ]
+    },
+    {
+      "mda": "Ministry of Homeland Security",
+      "location": "State Wide",
+      "n": 7,
+      "key": "012400100100|23010128|12642600",
+      "descriptions": [
+        "vi. Completion of Perimeter Fence with Security Room Publication Division) SERVICES Purchase of 30,000 units of Caliber 12 Gauge Cartridges",
+        "Purchase of 65 units of Ballistic Jacket vest with one Plate",
+        "Purchase of 40 units of Ballistic Jacket vest with two Plate"
+      ],
+      "amounts": [
+        80000000.0,
+        65000000.0,
+        80000000.0
+      ]
+    },
+    {
+      "mda": "Office of The Surveyor General",
+      "location": "State Wide",
+      "n": 6,
+      "key": "026000400100|23050101|12642600",
+      "descriptions": [
+        "Demacation and Survey of Resolved Bandry Dispute Araes",
+        "iii. Survey of Disposed Climate of Individual Land Persel",
+        "i. Densification of Different Levels/Order of Controls"
+      ],
+      "amounts": [
+        10000000.0,
+        2500000.0,
+        3000000.0
+      ]
+    }
+  ],
+  "composite_after_tighten": 0
+}

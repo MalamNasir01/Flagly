@@ -171,6 +171,9 @@ a{color:inherit;text-decoration:none}
 .results-section.visible{display:block}
 .results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px}
 .filter-bar{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+.not-checked-bar{margin:-4px 0 14px;padding:10px 14px;background:rgba(11,37,69,0.04);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--ink-600);line-height:1.5}
+.not-checked-bar strong{color:var(--navy-900);font-weight:600}
+.not-checked-bar .nc-item{display:inline-block;margin-right:14px}
 .filter-btn{background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;padding:5px 13px;font-size:11px;font-weight:600;color:var(--ink-600);cursor:pointer;font-family:inherit;transition:all .15s}
 .filter-btn:hover{border-color:var(--navy-700);color:var(--navy-900)}
 .filter-btn.active{background:var(--navy-900);border-color:var(--navy-900);color:#fff}
@@ -508,10 +511,13 @@ tbody td{padding:11px 12px;font-size:12px;vertical-align:middle}
           <button class="filter-btn" data-filter="MISSING_LOCATION" onclick="setFilter('MISSING_LOCATION')">No location</button>
           <button class="filter-btn" data-filter="VAGUE_LOCATION" onclick="setFilter('VAGUE_LOCATION')">Vague location</button>
           <button class="filter-btn" data-filter="GHOST_PROJECT" id="ghostFilter" onclick="setFilter('GHOST_PROJECT')">Ghost projects</button>
-          <button class="filter-btn" data-filter="MANDATE_MISMATCH" onclick="setFilter('MANDATE_MISMATCH')">Mandate mismatch</button>
+          <button class="filter-btn" data-filter="MANDATE_MISMATCH_HIGH" onclick="setFilter('MANDATE_MISMATCH_HIGH')">Mandate HIGH</button>
+          <button class="filter-btn" data-filter="MANDATE_MISMATCH_MEDIUM" onclick="setFilter('MANDATE_MISMATCH_MEDIUM')">Mandate MEDIUM</button>
           <button class="filter-btn" data-filter="COMPOSITE_DUPLICATE" onclick="setFilter('COMPOSITE_DUPLICATE')">Composite dup</button>
+          <button class="filter-btn" data-filter="OVERHEAD_DOMINANCE" id="overheadFilter" onclick="setFilter('OVERHEAD_DOMINANCE')">Overhead</button>
           <button class="filter-btn" data-filter="ZERO_ROLLOVER" onclick="setFilter('ZERO_ROLLOVER')">Zero rollover</button>
         </div>
+        <div class="not-checked-bar" id="notCheckedBar" style="display:none"></div>
         <div class="table-wrapper">
           <table>
             <thead><tr>
@@ -712,6 +718,7 @@ async function runScan() {
     allResults = (data.results || []).sort((a,b) => (b.risk_score||0) - (a.risk_score||0));
     renderSummary(data);
     updateGhostFilter(data.ghost_enabled);
+    updateNotCheckedFlags(data.flags_not_checked || []);
     currentPage = 1;
     currentFilter = 'all';
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
@@ -784,9 +791,54 @@ function updateGhostFilter(enabled) {
     btn.removeAttribute('title');
   } else {
     btn.classList.add('disabled');
-    btn.title = 'Upload multiple budget years to enable ghost project detection';
+    btn.title = 'Not checked for this format — upload multiple budget years to enable ghost project detection';
     if (currentFilter === 'GHOST_PROJECT') setFilter('all');
   }
+}
+
+function updateNotCheckedFlags(list) {
+  const bar = document.getElementById('notCheckedBar');
+  const overheadBtn = document.getElementById('overheadFilter');
+  const dupBtn = document.querySelector('.filter-btn[data-filter="DUPLICATE_CLUSTER"]');
+  const notChecked = Array.isArray(list) ? list : [];
+  const byType = {};
+  notChecked.forEach(x => { if (x && x.flag_type) byType[x.flag_type] = x.reason || 'Not checked for this format'; });
+
+  if (overheadBtn) {
+    if (byType.OVERHEAD_DOMINANCE) {
+      overheadBtn.classList.add('disabled');
+      overheadBtn.title = byType.OVERHEAD_DOMINANCE;
+      if (currentFilter === 'OVERHEAD_DOMINANCE') setFilter('all');
+    } else {
+      overheadBtn.classList.remove('disabled');
+      overheadBtn.removeAttribute('title');
+    }
+  }
+  if (dupBtn) {
+    if (byType.DUPLICATE_CLUSTER) {
+      dupBtn.classList.add('disabled');
+      dupBtn.title = byType.DUPLICATE_CLUSTER;
+      if (currentFilter === 'DUPLICATE_CLUSTER') setFilter('all');
+    } else {
+      dupBtn.classList.remove('disabled');
+      dupBtn.removeAttribute('title');
+    }
+  }
+  if (byType.GHOST_PROJECT) {
+    updateGhostFilter(false);
+    const ghostBtn = document.getElementById('ghostFilter');
+    if (ghostBtn) ghostBtn.title = byType.GHOST_PROJECT;
+  }
+
+  if (!notChecked.length) {
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+    return;
+  }
+  bar.style.display = 'block';
+  bar.innerHTML = '<strong>Not checked for this format:</strong> ' + notChecked.map(x =>
+    `<span class="nc-item">${esc(FLAG_TYPE_LABELS[x.flag_type] || x.flag_type)} — ${esc(x.reason || 'not available')}</span>`
+  ).join('');
 }
 
 function fmtNGN(v) {
@@ -817,6 +869,8 @@ function clearScan() {
   document.getElementById('tableBody').innerHTML = '';
   document.getElementById('findingsList').innerHTML = '';
   document.getElementById('chatAnswer').classList.remove('visible');
+  const ncBar = document.getElementById('notCheckedBar');
+  if (ncBar) { ncBar.style.display = 'none'; ncBar.innerHTML = ''; }
   hideResults(); hideError(); closeDetail(); updateBtn();
   destroyCharts();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -825,6 +879,8 @@ function clearScan() {
 function setFilter(f) {
   const ghostBtn = document.getElementById('ghostFilter');
   if (f === 'GHOST_PROJECT' && ghostBtn.classList.contains('disabled')) return;
+  const target = document.querySelector(`.filter-btn[data-filter="${f}"]`);
+  if (target && target.classList.contains('disabled')) return;
   currentFilter = f; currentPage = 1;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === f));
   applyFilters();
@@ -844,7 +900,25 @@ function applyFilters() {
   if (!showLowRisk) items = items.filter(r => r.risk_level !== 'LOW');
   if (currentFilter === 'HIGH') items = items.filter(r => r.risk_level === 'HIGH');
   else if (currentFilter === 'MEDIUM') items = items.filter(r => r.risk_level === 'MEDIUM');
-  else if (currentFilter !== 'all') items = items.filter(r => (r.flags||[]).some(f => f.flag_type === currentFilter));
+  else if (currentFilter === 'MANDATE_MISMATCH_HIGH') {
+    items = items.filter(r => (r.flags || []).some(f => {
+      if (f.flag_type !== 'MANDATE_MISMATCH') return false;
+      const sev = (f.severity || '').toUpperCase();
+      const kind = ((f.evidence || {}).mismatch_kind || '').toLowerCase();
+      return sev === 'HIGH' || kind === 'excluded';
+    }));
+  } else if (currentFilter === 'MANDATE_MISMATCH_MEDIUM') {
+    items = items.filter(r => (r.flags || []).some(f => {
+      if (f.flag_type !== 'MANDATE_MISMATCH') return false;
+      const sev = (f.severity || '').toUpperCase();
+      const kind = ((f.evidence || {}).mismatch_kind || '').toLowerCase();
+      return !(sev === 'HIGH' || kind === 'excluded');
+    }));
+  } else if (currentFilter === 'MANDATE_MISMATCH') {
+    items = items.filter(r => (r.flags || []).some(f => f.flag_type === 'MANDATE_MISMATCH'));
+  } else if (currentFilter !== 'all') {
+    items = items.filter(r => (r.flags || []).some(f => f.flag_type === currentFilter));
+  }
   if (currentSearch) {
     items = items.filter(r =>
       (r.description||'').toLowerCase().includes(currentSearch) ||
@@ -852,7 +926,15 @@ function applyFilters() {
       (r.location||'').toLowerCase().includes(currentSearch)
     );
   }
-  items.sort((a,b) => (b.risk_score||0) - (a.risk_score||0));
+  // Lead HIGH mandate mismatches; MEDIUM not-in-scope is secondary
+  items.sort((a, b) => {
+    const scoreDiff = (b.risk_score || 0) - (a.risk_score || 0);
+    if (scoreDiff) return scoreDiff;
+    const aHigh = (a.flags || []).some(f => f.flag_type === 'MANDATE_MISMATCH' && ((f.severity || '').toUpperCase() === 'HIGH' || ((f.evidence || {}).mismatch_kind || '').toLowerCase() === 'excluded'));
+    const bHigh = (b.flags || []).some(f => f.flag_type === 'MANDATE_MISMATCH' && ((f.severity || '').toUpperCase() === 'HIGH' || ((f.evidence || {}).mismatch_kind || '').toLowerCase() === 'excluded'));
+    if (aHigh !== bHigh) return bHigh ? 1 : -1;
+    return 0;
+  });
   filteredResults = items;
   renderTable();
 }
@@ -899,13 +981,18 @@ function buildTags(flags) {
     GHOST_PROJECT: () => 'GHOST',
     VAGUE_LOCATION: () => 'VAGUE',
     BUDGET_SPLITTING: () => 'SPLIT',
-    MANDATE_MISMATCH: () => 'MANDATE',
+    MANDATE_MISMATCH: f => {
+      const sev = (f.severity || '').toUpperCase();
+      const kind = ((f.evidence || {}).mismatch_kind || '').toLowerCase();
+      return (sev === 'HIGH' || kind === 'excluded') ? 'MANDATE HIGH' : 'MANDATE MED';
+    },
     OVERHEAD_DOMINANCE: () => 'OVERHEAD',
     COMPOSITE_DUPLICATE: f => `COMP (${f.cluster_size||'?'}x)`,
     INFLATED_PROJECTION: () => 'PROJ',
     PHANTOM_SPENDING: () => 'PHANTOM',
     VAGUE_HIGH_VALUE_SPEND: () => 'VAGUE HV',
     ZERO_ROLLOVER: () => 'ZERO ROL',
+    BLANK_APPROVED_AMOUNT: () => 'BLANK AMT',
   };
   return flags.map(f => {
     const fn = LABELS[f.flag_type];
@@ -1274,11 +1361,28 @@ function renderCharts() {
     if (ft === 'MANDATE_MISMATCH_MEDIUM') return 'Mandate (MEDIUM not-in-scope)';
     return FLAG_TYPE_LABELS[ft] || ft.replace(/_/g, ' ');
   };
-  const flagRows = Object.entries(flagCounts).sort((a, b) => b[1] - a[1]);
+  const flagRows = Object.entries(flagCounts).sort((a, b) => {
+    // Lead with HIGH mandate; MEDIUM not-in-scope is secondary
+    if (a[0] === 'MANDATE_MISMATCH_HIGH' || b[0] === 'MANDATE_MISMATCH_HIGH' ||
+        a[0] === 'MANDATE_MISMATCH_MEDIUM' || b[0] === 'MANDATE_MISMATCH_MEDIUM') {
+      const ar = a[0] === 'MANDATE_MISMATCH_HIGH' ? 2 : a[0] === 'MANDATE_MISMATCH_MEDIUM' ? 0 : 1;
+      const br = b[0] === 'MANDATE_MISMATCH_HIGH' ? 2 : b[0] === 'MANDATE_MISMATCH_MEDIUM' ? 0 : 1;
+      if (ar !== br) return br - ar;
+    }
+    return b[1] - a[1];
+  });
   if (!flagRows.length) {
     setChartEmpty('chartFlagsWrap', 'No items');
   } else {
     const canvas = ensureChartCanvas('chartFlagsWrap', 'chartFlags');
+    const wrap = document.getElementById('chartFlagsWrap');
+    const sub = wrap && wrap.parentElement && wrap.parentElement.querySelector('.chart-sub');
+    if (sub) {
+      const nc = (scanData.flags_not_checked || []).map(x => x.flag_type.replace(/_/g, ' ')).join(', ');
+      sub.textContent = nc
+        ? `HIGH mandate leads; MEDIUM not-in-scope is secondary. Not checked: ${nc}`
+        : 'HIGH mandate leads; MEDIUM not-in-scope is secondary';
+    }
     chartInstances.flags = new Chart(canvas, {
       type: 'bar',
       data: {
@@ -1859,9 +1963,43 @@ function downloadPDF() {
     ['Inflated Projection', fs.inflated_projection || 0],
     ['Phantom Spending', fs.phantom_spending || 0],
     ['Vague High Value', fs.vague_high_value || 0],
-    ['Zero Rollover', fs.zero_rollover || 0]
+    ['Zero Rollover', fs.zero_rollover || 0],
+    ['Blank Approved Amount (in results)', fs.blank_approved_amount || 0]
   ];
-  y = drawCountTable(y, fRows, headerTitle);
+  const blankMeta = scanData.blank_approved_amount || {};
+  if (blankMeta.total != null) {
+    fRows.push(
+      ['Blank Approved Amount (all, LOW)', blankMeta.low || 0],
+      ['Blank Approved Amount (all, MEDIUM)', blankMeta.medium || 0],
+      ['Blank informational-only (excluded from flagged)', blankMeta.informational_only_excluded || 0]
+    );
+  }
+  // Annotate flags not checked for this format (show as n/a, not zero)
+  const notChecked = new Set((scanData.flags_not_checked || []).map(x => x.flag_type));
+  const labelToType = {
+    'Duplicate Clusters': 'DUPLICATE_CLUSTER',
+    'Ghost Projects': 'GHOST_PROJECT',
+    'Overhead Dominance': 'OVERHEAD_DOMINANCE',
+  };
+  const fRowsDisplay = fRows.map(([label, n]) => {
+    const ft = labelToType[label];
+    if (ft && notChecked.has(ft)) return [label + ' (not checked for this format)', '—'];
+    return [label, n];
+  });
+  y = drawCountTable(y, fRowsDisplay, headerTitle);
+
+  if ((scanData.flags_not_checked || []).length) {
+    y = ensureSpace(y, 28, headerTitle);
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(8); setCol(C.muted);
+    const ncLines = (scanData.flags_not_checked || []).map(x =>
+      `${x.flag_type}: ${x.reason || 'Not checked for this format'}`
+    );
+    ncLines.forEach(line => {
+      y = ensureSpace(y, 10, headerTitle);
+      doc.text(line, M, y, { maxWidth: CW });
+      y += 5;
+    });
+  }
 
   y = ensureSpace(y, 20, headerTitle);
   y = sectionTitle('Top 10 Most Suspicious Items', y);

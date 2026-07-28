@@ -108,7 +108,7 @@ class StateInflationTests(unittest.TestCase):
 
 
 class BlankApprovedAmountTests(unittest.TestCase):
-    def test_blank_with_prior_is_medium(self):
+    def test_blank_with_prior_is_low_informational(self):
         row = _row(
             amount=None,
             budget_2026=None,
@@ -121,7 +121,24 @@ class BlankApprovedAmountTests(unittest.TestCase):
         flag = flag_blank_approved_amount(row)
         self.assertIsNotNone(flag)
         self.assertEqual(flag["flag_type"], "BLANK_APPROVED_AMOUNT")
+        self.assertEqual(flag["severity"], "LOW")
+        self.assertTrue(flag["evidence"].get("informational"))
+
+    def test_blank_large_prior_ongoing_is_medium(self):
+        row = _row(
+            amount=None,
+            budget_2026=None,
+            actuals_2024=120_000_000,
+            budget_2025=80_000_000,
+            project_status="ONGOING",
+            description="Continuation of classroom block phase 2",
+            _jurisdiction="state_niger",
+            _format_b=True,
+        )
+        flag = flag_blank_approved_amount(row)
+        self.assertIsNotNone(flag)
         self.assertEqual(flag["severity"], "MEDIUM")
+        self.assertTrue(flag["evidence"].get("anomaly"))
 
     def test_blank_without_prior_is_low(self):
         row = _row(amount=None, budget_2026=None, _format_b=True)
@@ -137,6 +154,34 @@ class BlankApprovedAmountTests(unittest.TestCase):
         # Overhead still returns None without is_mda_level / overhead columns
         row = _row(is_mda_level=False, overhead_amount=None, capital_amount=None)
         self.assertIsNone(flag_overhead_dominance(row))
+
+    def test_informational_blank_only_excluded_from_results(self):
+        import pandas as pd
+
+        df = pd.DataFrame([
+            {
+                "description": "Completed borehole project",
+                "amount": None,
+                "location": "BIDA",
+                "mda_name": "Ministry of Water Resources",
+                "mda_code": "025200100100",
+                "ministry": "Ministry of Water Resources",
+                "is_mda_level": False,
+                "actuals_2024": 40_000_000,
+                "budget_2025": 40_000_000,
+                "performance_2025": 10_000_000,
+                "budget_2026": None,
+                "economic_code": "23020105",
+                "location_code": "12611200",
+                "project_status": None,
+            }
+        ])
+        results = run_all_flags(df, budget_year="2026", jurisdiction="state_niger")
+        self.assertEqual(results, [])
+        from engines.flags import get_last_run_stats
+        blank = get_last_run_stats().get("blank_approved_amount") or {}
+        self.assertEqual(blank.get("low"), 1)
+        self.assertEqual(blank.get("informational_only_excluded"), 1)
 
 
 class StateMandatesFileTests(unittest.TestCase):

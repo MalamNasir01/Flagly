@@ -166,6 +166,8 @@ def _parse_location(line: str) -> Tuple[Optional[str], Optional[str]]:
     code, name = m.group(1), m.group(2).strip()
     name = re.sub(r"\s{2,}.*$", "", name).strip()
     if re.search(r"STATE\s*WIDE", name, re.I):
+        # Canonicalize spelling only — value comes from the PDF location column
+        # (e.g. 12642600 - State Wide), never used as a missing-location fallback.
         name = "State Wide"
     return code, name or None
 

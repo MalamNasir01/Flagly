@@ -722,6 +722,7 @@
         "medical_equipment",
         "pharmaceuticals",
         "disease_control",
+        "urban_infrastructure",
         "recurrent_admin"
       ],
       "excluded": [
@@ -806,6 +807,7 @@
       "scope": [
         "urban_infrastructure",
         "housing",
+        "roads",
         "recurrent_admin"
       ],
       "excluded": [
@@ -942,6 +944,7 @@
         "road_maintenance",
         "bridges",
         "urban_infrastructure",
+        "fire_service",
         "recurrent_admin"
       ],
       "excluded": [
@@ -1502,7 +1505,9 @@
       "scope": [
         "recurrent_admin",
         "ict_infrastructure",
-        "housing"
+        "housing",
+        "health_facilities",
+        "urban_infrastructure"
       ],
       "excluded": [
         "agriculture_inputs"
@@ -1521,6 +1526,7 @@
         "tertiary_education",
         "vocational_training",
         "educational_materials",
+        "urban_infrastructure",
         "recurrent_admin"
       ],
       "excluded": [

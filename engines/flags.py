@@ -1020,11 +1020,24 @@ def flag_overhead_dominance(row: Dict) -> Optional[Dict]:
 
 # ─── Flag 6: COMPOSITE_DUPLICATE (Format B exact key matching) ────────────────
 
+def _composite_desc_fingerprint(desc: str) -> str:
+    """Normalize description so only near-identical project lines share a fingerprint.
+
+    Composite codes alone are too coarse on state sheets (many distinct projects share
+    one economic + location code). Require the same fingerprint within the code key.
+    """
+    d = _str_cell(desc).lower()
+    d = re.sub(r'\s+', ' ', d).strip()
+    # Strip leading enumeration (i. / ii. / 1. / 12.)
+    d = re.sub(r'^(?:[ivxlcdm]+|\d+)[.)]\s*', '', d)
+    return d
+
+
 def flag_duplicates_composite(rows: List[Dict]) -> List[Dict]:
     """
-    Format B: exact composite key match on mda_code + economic_code + location_code.
-    Same MDA + Same Economic Code + Same Location = definitive duplicate.
-    All group members are flagged (no exclusion — every instance is suspect).
+    Format B: duplicate when mda_code + economic_code + location_code match AND the
+    normalized project description is the same (near-identical line, not merely the
+    same procurement class — e.g. two different vehicle buys must not match).
     """
     from collections import defaultdict
 
@@ -1049,28 +1062,49 @@ def flag_duplicates_composite(rows: List[Dict]) -> List[Dict]:
     for key, group in key_groups.items():
         if len(group) < 2:
             continue
-        n = len(group)
-        amounts = [float(r['amount']) for r in group if not _is_null_amount(r.get('amount'))]
-        total_amount = sum(amounts)
-        mda_part, eco_part, loc_part = key.split('|', 2)
+        # Sub-cluster by description fingerprint — codes alone over-match on state sheets
+        by_desc: Dict[str, List[Dict]] = defaultdict(list)
+        for row in group:
+            fp = _composite_desc_fingerprint(
+                row.get('description') or row.get('project_name')
+            )
+            if len(fp) < 12:
+                continue  # too short / empty — do not invent a duplicate
+            by_desc[fp].append(row)
 
-        severity = 'HIGH' if (n >= 3 or total_amount > 100_000_000) else 'MEDIUM'
-        explanation = (
-            f'MDA {mda_part} allocated economic code {eco_part} spending at location '
-            f'{loc_part} {n} times. Total double-allocated amount: {_fmt_amount(total_amount)}.'
-        )
-        cluster_row_ids = [r.get('row_id') for r in group]
-        flag = {
-            'flag_type':    'COMPOSITE_DUPLICATE',
-            'severity':     severity,
-            'title':        f'Composite Duplicate ({n}×)',
-            'explanation':  explanation,
-            'cluster_size': n,
-            'matched_rows': cluster_row_ids,
-        }
-        for member in group:
-            member.setdefault('_flags', []).append(flag)
-            member['cluster_size'] = n
+        mda_part, eco_part, loc_part = key.split('|', 2)
+        for fp, members in by_desc.items():
+            if len(members) < 2:
+                continue
+            n = len(members)
+            amounts = [
+                float(r['amount']) for r in members
+                if not _is_null_amount(r.get('amount'))
+            ]
+            total_amount = sum(amounts)
+            severity = 'HIGH' if (n >= 3 or total_amount > 100_000_000) else 'MEDIUM'
+            explanation = (
+                f'MDA {mda_part} repeated the same project line under economic code '
+                f'{eco_part} at location {loc_part} {n} times '
+                f'(identical description after normalizing enumeration). '
+                f'Total double-allocated amount: {_fmt_amount(total_amount)}.'
+            )
+            cluster_row_ids = [r.get('row_id') for r in members]
+            flag = {
+                'flag_type':    'COMPOSITE_DUPLICATE',
+                'severity':     severity,
+                'title':        f'Composite Duplicate ({n}×)',
+                'explanation':  explanation,
+                'cluster_size': n,
+                'matched_rows': cluster_row_ids,
+                'evidence': {
+                    'composite_key': key,
+                    'description_fingerprint': fp[:120],
+                },
+            }
+            for member in members:
+                member.setdefault('_flags', []).append(flag)
+                member['cluster_size'] = n
 
     return rows
 
@@ -1189,11 +1223,36 @@ def flag_zero_implementation_rollover(row: Dict) -> Optional[Dict]:
 
 # ─── Flag: BLANK_APPROVED_AMOUNT (state / Format B) ───────────────────────────
 
-def flag_blank_approved_amount(row: Dict) -> Optional[Dict]:
-    """Surface rows whose 2026 approved amount is blank — do not drop them silently.
+_BLANK_ONGOING_RE = re.compile(
+    r'\b(?:'
+    r'ongoing|continuation|continuing|roll[\s-]?over|carried?\s+over|'
+    r'phase\s*[2-9]|phase\s*ii+|new\s+phase|still\s+under\s+construction|'
+    r'completion\s+of'
+    r')\b',
+    re.I,
+)
+_BLANK_ANOMALY_PRIOR_NGN = 50_000_000  # large prior spend threshold for MEDIUM escalate
 
-    MEDIUM when prior-year actuals/budget/performance exist (dropped/completed/rollover
-    question). LOW when the approved column is blank with no prior-year figures.
+
+def _blank_amount_ongoing_signal(row: Dict) -> Optional[str]:
+    """Return a short label when the line still looks active (not a routine wind-down)."""
+    status = _str_cell(row.get('project_status')).upper()
+    if status in ('ONGOING', 'NEW', 'CONTINUATION', 'ACTIVE'):
+        return f'status={status}'
+    desc = _str_cell(row.get('description') or row.get('project_name'))
+    m = _BLANK_ONGOING_RE.search(desc)
+    if m:
+        return f'description:{m.group(0).lower()}'
+    return None
+
+
+def flag_blank_approved_amount(row: Dict) -> Optional[Dict]:
+    """Surface blank 2026 approved amounts on state / Format B rows.
+
+    Default LOW/informational: prior-year spend with no 2026 vote is usually a
+    completed or discontinued line (normal wind-down), not a red flag.
+    Escalate to MEDIUM only on a genuine anomaly — large prior-year spend AND
+    an ongoing/new signal (project_status or description).
     Federal Format A/C rows are unaffected (gate on jurisdiction/format_b).
     """
     jurisdiction = str(row.get('_jurisdiction') or '')
@@ -1205,6 +1264,7 @@ def flag_blank_approved_amount(row: Dict) -> Optional[Dict]:
         return None
 
     prior_fields = {}
+    max_prior = 0.0
     for key, label in (
         ('actuals_2024', '2024 actuals'),
         ('budget_2025', '2025 revised budget'),
@@ -1213,21 +1273,34 @@ def flag_blank_approved_amount(row: Dict) -> Optional[Dict]:
         val = row.get(key)
         if not _is_null_amount(val) and float(val) != 0:
             prior_fields[label] = float(val)
+            max_prior = max(max_prior, float(val))
 
-    if prior_fields:
+    ongoing = _blank_amount_ongoing_signal(row)
+    anomaly = bool(prior_fields and max_prior >= _BLANK_ANOMALY_PRIOR_NGN and ongoing)
+
+    if anomaly:
         severity = 'MEDIUM'
-        title = 'Blank 2026 Approved Amount (Prior Spend)'
+        title = 'Blank 2026 Approved Amount (Active Line)'
         explanation = (
-            'This line has no 2026 approved amount, but prior-year figures are present '
+            'This line has no 2026 approved amount despite large prior-year figures '
+            f"({', '.join(f'{k}={_fmt_amount(v)}' for k, v in prior_fields.items())}) "
+            f'and still looks active ({ongoing}). Ask whether funding was omitted in error.'
+        )
+    elif prior_fields:
+        severity = 'LOW'
+        title = 'Blank 2026 Approved Amount (Likely Wind-Down)'
+        explanation = (
+            'No 2026 approved amount with prior-year figures present '
             f"({', '.join(f'{k}={_fmt_amount(v)}' for k, v in prior_fields.items())}). "
-            'Ask whether the project was dropped, completed, or rolled without a 2026 vote.'
+            'Usually completed or discontinued — informational, not a red flag unless '
+            'the project is still marked ongoing.'
         )
     else:
         severity = 'LOW'
         title = 'Blank 2026 Approved Amount'
         explanation = (
             'This capital line has a blank 2026 approved amount in the state budget table. '
-            'It is retained in the scan for completeness; confirm whether funding is nil or omitted.'
+            'Informational only; confirm whether funding is nil or omitted.'
         )
 
     return {
@@ -1239,6 +1312,10 @@ def flag_blank_approved_amount(row: Dict) -> Optional[Dict]:
             'amount_2026': None,
             'prior_year_fields': prior_fields,
             'budget_2026': row.get('budget_2026'),
+            'max_prior': max_prior or None,
+            'ongoing_signal': ongoing,
+            'anomaly': anomaly,
+            'informational': severity == 'LOW',
         },
     }
 
@@ -1371,14 +1448,36 @@ def run_all_flags(
 
     rows = flag_budget_splitting(rows)
 
+    def _is_informational_blank_only(flags: List[Dict]) -> bool:
+        """Routine blank-amount LOW notes are not primary red flags."""
+        if len(flags) != 1:
+            return False
+        f = flags[0]
+        if (f.get('flag_type') or '') != 'BLANK_APPROVED_AMOUNT':
+            return False
+        return (f.get('severity') or '').upper() == 'LOW'
+
     # Build final result: only flagged non-excluded rows
     results = []
+    blank_low = blank_medium = blank_informational_only = 0
     for row in rows:
         if row.get('_exclude'):
             continue
         flags = row.get('_flags', [])
         if not flags:
             continue
+
+        for f in flags:
+            if (f.get('flag_type') or '') != 'BLANK_APPROVED_AMOUNT':
+                continue
+            if (f.get('severity') or '').upper() == 'MEDIUM':
+                blank_medium += 1
+            else:
+                blank_low += 1
+
+        if _is_informational_blank_only(flags):
+            blank_informational_only += 1
+            continue  # keep in blank stats; do not inflate flagged rate
 
         results.append({
             'row_id':          row.get('row_id'),
@@ -1407,4 +1506,28 @@ def run_all_flags(
         })
 
     LAST_RUN_STATS['flagged_items'] = len(results)
+    LAST_RUN_STATS['blank_approved_amount'] = {
+        'total': blank_low + blank_medium,
+        'low': blank_low,
+        'medium': blank_medium,
+        'informational_only_excluded': blank_informational_only,
+    }
+    if is_state:
+        LAST_RUN_STATS['flags_not_checked'] = [
+            {
+                'flag_type': 'OVERHEAD_DOMINANCE',
+                'reason': 'Not checked for this format — no overhead/capital MDA-level fields',
+            },
+            {
+                'flag_type': 'DUPLICATE_CLUSTER',
+                'reason': 'Not checked for this format — state sheets use COMPOSITE_DUPLICATE instead',
+            },
+            {
+                'flag_type': 'GHOST_PROJECT',
+                'reason': 'Multi-year ghost detection not checked for this format '
+                          '(upload multiple federal years to enable)',
+            },
+        ]
+    else:
+        LAST_RUN_STATS['flags_not_checked'] = []
     return results

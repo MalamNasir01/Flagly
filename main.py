@@ -174,8 +174,13 @@ def process_single(contents: bytes, filename: str, budget_year: str) -> Dict[str
     out["visuals"] = visuals_payload(scored)
     out["multi_year"] = False
     out["ghost_enabled"] = False
-    # Null-2026 rows remain in total_items; blank-approved flag keeps them visible in results
+    # Null-2026 rows remain in total_items; blank-approved flag keeps them visible when anomalous
     out["null_approved_amount_count"] = int(df["amount"].isna().sum()) if "amount" in df.columns else 0
+    stats = get_last_run_stats()
+    out["blank_approved_amount"] = stats.get("blank_approved_amount") or {
+        "total": 0, "low": 0, "medium": 0, "informational_only_excluded": 0,
+    }
+    out["flags_not_checked"] = stats.get("flags_not_checked") or []
     return out
 
 
