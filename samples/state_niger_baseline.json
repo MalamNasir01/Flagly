@@ -1,0 +1,180 @@
+{
+  "jurisdiction": "state_niger",
+  "profile_id": "niger_v1",
+  "note": "Re-snapshotted after fixing Niger wrapped-line row-boundary merges. Prior item count 1014 encoded the merge bug; count rises as merged rows split. Federal baseline is unaffected and must stay green.",
+  "prior_buggy_item_count": 1014,
+  "total_items": 1669,
+  "amount_non_null_pct": 68.6,
+  "flagged_items": 268,
+  "mandate_high": 6,
+  "mandate_medium": 145,
+  "flag_counts": {
+    "INFLATED_AMOUNT": 66,
+    "MANDATE_MISMATCH": 151,
+    "CONTEXT_MISMATCH": 14,
+    "VAGUE_HIGH_VALUE_SPEND": 11,
+    "PHANTOM_SPENDING": 7,
+    "BUDGET_SPLITTING": 28,
+    "VAGUE_LOCATION": 8,
+    "BLANK_APPROVED_AMOUNT": 33
+  },
+  "parse_quality": {
+    "suspect_rows": 46,
+    "rows_checked": 1669
+  },
+  "top10_by_amount": [
+    {
+      "rank": 1,
+      "description": "Support improvement to Basic & secondary education opportunities for the girl child. (AGILE) (World Bank Loan)",
+      "amount": 50337168767.65,
+      "mda": "Ministry of Basic & Secondary",
+      "location": "CHANCHAGA",
+      "merge_issues": []
+    },
+    {
+      "rank": 2,
+      "description": "Reconstruction of Minna - Bida Road( IsDB/ADFD)",
+      "amount": 44900000000.0,
+      "mda": "Ministry of Works",
+      "location": "CHANCHAGA",
+      "merge_issues": []
+    },
+    {
+      "rank": 3,
+      "description": "v. Establishment of Special Agro-Processing Zone (AFDB)",
+      "amount": 42050000000.0,
+      "mda": "Ministry of Agriculture",
+      "location": "State Wide",
+      "merge_issues": []
+    },
+    {
+      "rank": 4,
+      "description": "Extension of pipeline to new settlements and rehabilitation of existing ones within chanchaga (SURWASH)",
+      "amount": 36282664000.0,
+      "mda": "Ministry of Water Resources",
+      "location": "CHANCHAGA",
+      "merge_issues": []
+    },
+    {
+      "rank": 5,
+      "description": "Reconstruction/Expansion of Township Roads in Minna Phase I & II",
+      "amount": 30158801190.0,
+      "mda": "Ministry of Works",
+      "location": "CHANCHAGA",
+      "merge_issues": []
+    },
+    {
+      "rank": 6,
+      "description": "Construction of Roads in 17 LGAs: Agaie, Edati, Gbako, Gurara, Katcha, Lapai, Lavun, Magama, Mariga, Mashegu, Mokwa, Munya, Paikoro, Rafi, Rijau, Shiroro and Tafa, Borgu bond project",
+      "amount": 28500000000.0,
+      "mda": "Ministry of Works",
+      "location": "State Wide",
+      "merge_issues": []
+    },
+    {
+      "rank": 7,
+      "description": "Construction of Bida Ring Road (41km)",
+      "amount": 20000000000.0,
+      "mda": "Ministry of Works",
+      "location": "BIDA",
+      "merge_issues": []
+    },
+    {
+      "rank": 8,
+      "description": "Construction of Political appointees' office Complex Minna",
+      "amount": 20000000000.0,
+      "mda": "Office of the Secretary to the State Government",
+      "location": "CHANCHAGA",
+      "merge_issues": []
+    },
+    {
+      "rank": 9,
+      "description": "iii.Construction of modern skill aqusition centre to Support SMEs",
+      "amount": 18620000000.0,
+      "mda": "Niger State Planning Commission",
+      "location": "CHANCHAGA",
+      "merge_issues": []
+    },
+    {
+      "rank": 10,
+      "description": "Construction of Kontagora to Rijau Road (90km)",
+      "amount": 16000000000.0,
+      "mda": "Ministry of Works",
+      "location": "RIJAU",
+      "merge_issues": []
+    }
+  ],
+  "demerge_amount_corrections": [
+    {
+      "was": "Development of Software for MDAs \u2026 Construction of 10km Rural Roads \u2026 at Katcha",
+      "old_amount_note": "Merged row carried 5,400,000,000 (roads 2026); software 100,000,000 was absorbed",
+      "now": [
+        {
+          "description": "Development of Software for MDAs",
+          "amount": 100000000.0,
+          "verified_amount": 100000000.0
+        },
+        {
+          "description": "Construction of 10km Rural Roads and Markets)World Bank at Katcha",
+          "amount": 5400000000.0,
+          "verified_amount": 5400000000.0
+        }
+      ]
+    },
+    {
+      "was": "Extension of pipeline \u2026 (SURWASH) \u2026 Compensation \u2026 Lenfa",
+      "old_amount_note": "Merged row carried 36,282,664,000 (SURWASH 2026); Lenfa amount blank/nan was absorbed",
+      "now": [
+        {
+          "description": "Extension of pipeline to new settlements and rehabilitation of existing ones within chanchaga (SURWASH)",
+          "amount": 36282664000.0,
+          "verified_amount": 36282664000.0
+        },
+        {
+          "description": "Compensation of land acquired from the indigenes of Lenfa community",
+          "amount": null,
+          "verified_amount": null
+        }
+      ]
+    },
+    {
+      "was": "Erosion Control \u2026 at Mokwa \u2026 Erosion Control \u2026 Behind FUT, Minna",
+      "old_amount_note": "Merged row made Mokwa/FUT 2026 amounts unreliable; now split to 6,667,425,000 and 2,225,390,000",
+      "now": [
+        {
+          "description": "Erosion Control and Agro Climatic Activities (ACReSAL) at Mokwa",
+          "amount": 6667425000.0,
+          "verified_amount": 6667425000.0
+        },
+        {
+          "description": "Erosion Control and Management Work Behind FUT, Minna(World Bank Loan)",
+          "amount": 2225390000.0,
+          "verified_amount": 2225390000.0
+        }
+      ]
+    },
+    {
+      "was": "and Sanitation, Forestry Regeneration \u2026 (mid-phrase start)",
+      "old_amount_note": "745,000,000 on the truncated mid-phrase row; description now complete",
+      "now": [
+        {
+          "description": "Suleja, Chanchaga Model Cities Masterplan; Pilot projects in Water and Sanitation, Forestry Regeneration (UN-HABITA)",
+          "amount": 745000000.0,
+          "verified_amount": 745000000.0
+        }
+      ]
+    }
+  ],
+  "columns_detected": [
+    "project_name",
+    "administrative",
+    "economic",
+    "function",
+    "location",
+    "actuals_2024",
+    "budget_2025",
+    "performance_2025",
+    "approved_2026"
+  ],
+  "amount_column_used": "approved_2026"
+}

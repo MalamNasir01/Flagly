@@ -1,0 +1,22 @@
+Niger State Government 2026 Approved Budget - Capital Expenditure by Project
+Project Name                                                             Administrative Code and Description               Economic Code and Description              Function Code and Description     Location Code and Description     2024 Full Year Actuals       2025 Revised Budget     2025 Performance     2026 Approved Budget
+Development of Software for MDAs
+                                                                         011101300100 - Ministry of special Duties and     23050102 - COMPUTER SOFTWARE ACQUISITION  70133 - OTHER GENERAL SERVICES           12642600 - STATE WIDE                    -      50,000,000.00                   -     100,000,000.00
+                                                                         Intergovernmental Affairs
+Construction of 10km Rural Roads and Markets)World Bank at Katcha        021500100100 - Ministry of Agriculture             23020114 - CONSTRUCTION / PROVISION OF     70421 - AGRICULTURE                      12611300 - KATCHA                        -   2,000,000,000.00                   -   5,400,000,000.00
+                                                                                                                           ROADS
+Extension of pipeline to new settlements and rehabilitation of
+                                                                         025200100100 - Ministry of Water Resources        23020105 - CONSTRUCTION / PROVISION OF     70630 - WATER SUPPLY                     12621600 - CHANCHAGA                     -  10,000,000,000.00                   -  36,282,664,000.00
+existing ones within chanchaga (SURWASH)
+                                                                                                                           WATER-WAYS
+Compensation of land acquired from the indigenes of Lenfa
+                                                                         025200100100 - Ministry of Water Resources        23010101 - PURCHASE / ACQUISITION OF LAND  70611 - HOUSING DEVELOPMENT              12642600 - STATE WIDE                    -                 -                   -                 -
+community
+Erosion Control and Agro Climatic Activities (ACReSAL) at Mokwa          053500100100 - Ministry of Environment             23040102 - EROSION & FLOOD CONTROL         70540 - PROTECTION OF BIODIVERSITY        12611800 - MOKOWA                        -   3,000,000,000.00                   -   6,667,425,000.00
+Erosion Control and Management Work Behind FUT, Minna(World Bank Loan)   053500100100 - Ministry of Environment             23040102 - EROSION & FLOOD CONTROL         70540 - PROTECTION OF BIODIVERSITY        12621600 - CHANCHAGA                     -   1,000,000,000.00                   -   2,225,390,000.00
+Suleja, Chanchaga Model Cities Masterplan; Pilot projects in Water
+                                                                         026000100100 - Ministry of Lands and Survey        23050101 - RESEARCH AND DEVELOPMENT        70621 - COMMUNITY DEVELOPMENT             12642600 - STATE WIDE                    -     745,000,000.00                   -     745,000,000.00
+and Sanitation, Forestry Regeneration (UN-HABITA)
+Payment of Compensation for New Areas in Minna and Affected by
+                                                                         026000100100 - Ministry of Lands and Survey        23010101 - PURCHASE / ACQUISITION OF LAND  70611 - HOUSING DEVELOPMENT               12621600 - CHANCHAGA                     -     700,000,000.00                   -   1,409,000,000.00
+Urban Renewal Projects
