@@ -1,8 +1,8 @@
 {
   "_meta": {
     "purpose": "Seed mapping of Nigerian federal MDAs to their statutory scope. Used by the mandate mismatch flag engine. A project category found in an MDA excluded list fires a HIGH mandate mismatch flag. A project category not in scope and not in excluded is a MEDIUM flag pending review.",
-    "version": "0.1",
-    "last_updated": "2026-07-26",
+    "version": "0.2",
+    "last_updated": "2026-07-28",
     "notes": "Expand with every MDA appearing in the 2026 FGN appropriation bill before going to a real newsroom. State-level MDA mandates are out of scope for this file and belong in a separate mda_mandates_states.json.",
     "category_vocabulary": [
       "roads",
@@ -75,8 +75,8 @@
   "mdas": [
     {
       "name": "Federal Road Maintenance Agency",
-      "aliases": ["FERMA", "FRMA", "Road Maintenance Agency"],
-      "scope": ["road_maintenance", "bridges", "recurrent_admin"],
+      "aliases": ["FERMA", "FRMA", "Road Maintenance Agency", "FEDERAL ROAD MAINTENANCE AGENCY"],
+      "scope": ["roads", "road_maintenance", "bridges", "urban_infrastructure", "recurrent_admin"],
       "excluded": [
         "primary_schools",
         "secondary_schools",
@@ -91,8 +91,8 @@
     },
     {
       "name": "Federal Ministry of Works",
-      "aliases": ["Ministry of Works", "FMW"],
-      "scope": ["roads", "road_maintenance", "bridges", "urban_infrastructure", "recurrent_admin"],
+      "aliases": ["Ministry of Works", "FMW", "FEDERAL MINISTRY OF WORKS"],
+      "scope": ["roads", "road_maintenance", "bridges", "urban_infrastructure", "renewable_energy", "recurrent_admin"],
       "excluded": [
         "primary_schools",
         "health_facilities",
@@ -102,13 +102,16 @@
     },
     {
       "name": "Federal Ministry of Health and Social Welfare",
-      "aliases": ["Ministry of Health", "FMoH", "FMOH"],
+      "aliases": ["Ministry of Health", "FMoH", "FMOH", "FEDERAL MINISTRY OF HEALTH AND SOCIAL WELFARE", "FEDERAL MINISTRY OF HEALTH AND SOCIAL WELFARE - HQTRS"],
       "scope": [
         "health_facilities",
         "medical_equipment",
         "pharmaceuticals",
         "disease_control",
         "social_welfare",
+        "research_development",
+        "vocational_training",
+        "ict_infrastructure",
         "recurrent_admin"
       ],
       "excluded": [
@@ -140,13 +143,14 @@
     },
     {
       "name": "Federal Ministry of Agriculture and Food Security",
-      "aliases": ["Ministry of Agriculture", "FMARD", "Ministry of Ag"],
+      "aliases": ["Ministry of Agriculture", "FMARD", "Ministry of Ag", "FEDERAL MINISTRY OF AGRICULTURE AND FOOD SECURITY", "FEDERAL MINISTRY OF AGRICULTURE AND FOOD SECURITY - HQTRS"],
       "scope": [
         "agriculture_inputs",
         "irrigation",
         "livestock",
         "fisheries",
         "food_storage",
+        "renewable_energy",
         "recurrent_admin"
       ],
       "excluded": [
@@ -170,8 +174,8 @@
     },
     {
       "name": "Federal Ministry of Water Resources and Sanitation",
-      "aliases": ["Ministry of Water Resources", "FMWR"],
-      "scope": ["water_supply", "sanitation", "dams", "irrigation", "recurrent_admin"],
+      "aliases": ["Ministry of Water Resources", "FMWR", "FEDERAL MINISTRY OF WATER RESOURCES AND SANITATION", "FEDERAL MINISTRY OF WATER RESOURCES AND SANITATION - HQTRS"],
+      "scope": ["water_supply", "sanitation", "dams", "irrigation", "urban_infrastructure", "renewable_energy", "recurrent_admin"],
       "excluded": [
         "roads",
         "primary_schools",
@@ -181,11 +185,12 @@
     },
     {
       "name": "Federal Ministry of Power",
-      "aliases": ["Ministry of Power", "FMP"],
+      "aliases": ["Ministry of Power", "FMP", "FEDERAL MINISTRY OF POWER", "FEDERAL MINISTRY OF POWER -HQTRS"],
       "scope": [
         "electricity_generation",
         "electricity_distribution",
         "renewable_energy",
+        "urban_infrastructure",
         "recurrent_admin"
       ],
       "excluded": [
@@ -232,12 +237,14 @@
     },
     {
       "name": "Federal Ministry of Environment",
-      "aliases": ["Ministry of Environment", "FMoE Env"],
+      "aliases": ["Ministry of Environment", "FMoE Env", "FEDERAL MINISTRY OF ENVIRONMENT", "FEDERAL MINISTRY OF ENVIRONMENT HEADQUARTERS"],
       "scope": [
         "environmental_protection",
         "climate_action",
         "forestry",
         "sanitation",
+        "urban_infrastructure",
+        "renewable_energy",
         "recurrent_admin"
       ],
       "excluded": [
@@ -351,8 +358,8 @@
     },
     {
       "name": "Federal Ministry of Housing and Urban Development",
-      "aliases": ["Ministry of Housing", "FMoHUD"],
-      "scope": ["housing", "urban_infrastructure", "recurrent_admin"],
+      "aliases": ["Ministry of Housing", "FMoHUD", "FEDERAL MINISTRY OF HOUSING AND URBAN DEVELOPMENT", "FEDERAL MINISTRY OF HOUSING AND URBAN DEVELOPMENT - HQTRS"],
+      "scope": ["housing", "urban_infrastructure", "roads", "water_supply", "renewable_energy", "recurrent_admin"],
       "excluded": [
         "primary_schools",
         "health_facilities",

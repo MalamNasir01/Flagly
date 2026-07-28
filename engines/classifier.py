@@ -9,18 +9,77 @@ Tie break (documented in data/category_keywords.json _meta.tie_break):
 
 Disambiguation: category_exclusions suppress a category when a context phrase is present
 (e.g. labour_programs blocked by "direct labour").
+
+Location context: destination phrases after along/at/to/linking are stripped before
+keyword matching so incidental place nouns (a school a road leads to, a road a
+housing estate sits along) do not steal the category from the project action/object.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Dict, List, Optional, Set, Tuple
 
 
 # Generic admin catch-alls — deprioritized so "installation of solar lights"
 # maps to renewable_energy via "solar lights", not recurrent_admin via "installation of".
 CATCHALL_CATEGORIES: Set[str] = {'recurrent_admin'}
+
+# Strip destination / beneficiary tails so "Access Road to link X Primary School"
+# classifies as roads, not primary_schools.
+_LOCATION_CONTEXT_RE = re.compile(
+    r'(?:'
+    r'\balong\s+[\w][\w\s\-/,]{0,80}?'
+    r'|\bto\s+link(?:ing)?\s+.+'
+    r'|\blinking\s+.+'
+    r'|\bto\s+(?:the\s+)?(?:link|connect)\s+.+'
+    r')\s*$',
+    re.I,
+)
+
+# Action/object heads that must beat incidental nouns still left in the text.
+# Order matters: campus / access-to-place / housing before generic road-works.
+_ACTION_HEAD_PATTERNS: List[Tuple[re.Pattern, str, str]] = [
+    (re.compile(r'\bhousing\s+units?\b', re.I), 'housing', 'housing units'),
+    (re.compile(
+        r'\broad\s+network\b.*\bcampus\b|\bcampus\b.*\broad(?:\s+network)?\b',
+        re.I,
+    ), 'tertiary_education', 'campus road'),
+    # Access / link road TO a place (school, market) is still a road project.
+    (re.compile(r'\baccess\s+road\b', re.I), 'roads', 'access road'),
+    (re.compile(
+        r'\b(?:construction|rehabilitation|reconstruction|duali[sz]ation|dual\s+carriage)'
+        r'.{0,120}\broads?\b'
+        r'|'
+        r'\broads?\b.{0,60}\b(?:construction|rehabilitation|reconstruction|duali[sz]ation)\b'
+        r'|'
+        r'\b(?:length\s+of\s+road|duali[sz]ation\s+of\s+road)\b',
+        re.I,
+    ), 'roads', 'road works'),
+    (re.compile(
+        r'\bpurchase\s+of\b.{0,80}\b(?:toyota|hilux|camry|corolla|vehicle|vehicles|buses?)\b',
+        re.I,
+    ), 'recurrent_admin', 'vehicle purchase'),
+    (re.compile(
+        r'\b(?:ambulance|surveillance|survellance)\s*/?\s*(?:surveillance|survellance)?\s*boats?\b',
+        re.I,
+    ), 'water_transport', 'ambulance/surveillance boat'),
+    (re.compile(
+        r'\b(?:dietary\s+habits|healthy\s+lifestyles|social\s+marketing|\bsbcc\b)\b',
+        re.I,
+    ), 'broadcasting', 'communications campaign'),
+    (re.compile(r'\bhigher\s+institutions?\b', re.I), 'tertiary_education', 'higher institutions'),
+    (re.compile(
+        r'\b(?:renovation|construction|completion)\b.{0,40}\b(?:classroom|hostel|lecture\s+hall|laboratory)\b'
+        r'.{0,60}\b(?:college|university|polytechnic|school\s+of\s+health|midwifery)\b'
+        r'|'
+        r'\b(?:college|university|polytechnic|school\s+of\s+health|midwifery)\b'
+        r'.{0,60}\b(?:renovation|construction|completion)\b.{0,40}\b(?:classroom|hostel|lecture\s+hall|laboratory)\b',
+        re.I,
+    ), 'tertiary_education', 'institution facility'),
+]
 
 
 def _data_path(name: str) -> str:
@@ -82,6 +141,36 @@ def _sorted_keyword_index() -> List[Tuple[str, str, int, int]]:
 _KEYWORD_INDEX = _sorted_keyword_index()
 
 
+def _strip_location_context(text: str) -> str:
+    """Remove along/to-link/linking destination tails used as location, not category."""
+    if not text:
+        return text
+    stripped = _LOCATION_CONTEXT_RE.sub('', text).strip()
+    # Also cut "along <place> road|highway|expressway" mid-string (housing along X road).
+    stripped = re.sub(
+        r'\balong\s+[\w][\w\s\-/,]{0,60}?\b(?:road|highway|expressway|way)\b',
+        ' ',
+        stripped,
+        flags=re.I,
+    )
+    stripped = re.sub(
+        r'\bto\s+link(?:ing)?\s+[\w][\w\s\-/,]{0,80}',
+        ' ',
+        stripped,
+        flags=re.I,
+    )
+    stripped = re.sub(r'\s+', ' ', stripped).strip()
+    return stripped or text
+
+
+def _match_action_head(text: str) -> Optional[Tuple[str, str]]:
+    """Prefer the project action/object over incidental nouns."""
+    for pattern, category, label in _ACTION_HEAD_PATTERNS:
+        if pattern.search(text):
+            return category, label
+    return None
+
+
 def _keyword_in_text(text: str, kw: str) -> bool:
     """Case-folded substring match with word-boundary protection for short tokens.
 
@@ -92,7 +181,6 @@ def _keyword_in_text(text: str, kw: str) -> bool:
     if not kw:
         return False
     if len(kw) <= 4 and kw.replace(' ', '').isalnum() and ' ' not in kw:
-        import re
         return re.search(rf'(?<![a-z0-9]){re.escape(kw)}(?![a-z0-9])', text) is not None
     return kw in text
 
@@ -108,19 +196,28 @@ def classify_with_match(description: str) -> Tuple[Optional[str], Optional[str]]
     """Return (category, matched_keyword_or_override_phrase) for evidence/logging."""
     if not description:
         return None, None
-    text = description.lower()
+    raw = description.lower()
 
-    # 1) Phrase overrides — forced category wins immediately.
+    # 1) Phrase overrides — forced category wins immediately (on raw text).
     for phrase, forced in PHRASE_OVERRIDES:
-        if phrase and phrase in text and forced is not None:
+        if phrase and phrase in raw and forced is not None:
             return forced, phrase
+
+    # 2) Action/object heads beat incidental location/beneficiary nouns.
+    action = _match_action_head(raw)
+    if action:
+        return action
+
+    # 3) Strip along/at/to/linking destination tails, then keyword-scan.
+    text = _strip_location_context(raw)
 
     best = None
     best_kw = None
+    # Keyword scan on location-stripped text; exclusions still see raw destination cues.
     for cat, kw, neg_len, vi in _KEYWORD_INDEX:
         if not _keyword_in_text(text, kw):
             continue
-        if _category_blocked(cat, text):
+        if _category_blocked(cat, raw) or _category_blocked(cat, text):
             continue
         # Sort key: domain first, then longest keyword, then vocabulary order.
         is_catchall = 1 if cat in CATCHALL_CATEGORIES else 0

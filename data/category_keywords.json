@@ -1,9 +1,9 @@
 {
   "_meta": {
     "purpose": "Deterministic keyword to category map for Flagly. Keys are categories from mda_mandates.json _meta.category_vocabulary.",
-    "version": "1.3",
+    "version": "1.4",
     "tie_break": "1) Phrase overrides (forced category or hard block) apply first. 2) Domain categories beat catch-all recurrent_admin (so 'installation of solar lights' → renewable_energy, not admin). 3) Among remaining hits, longest matching keyword wins (most specific). 4) If equal length, earlier category in mda_mandates._meta.category_vocabulary wins. Matching is case-insensitive substring search (short tokens use word boundaries).",
-    "disambiguation": "category_exclusions: if any exclusion phrase for a category appears in the description, keyword hits for that category are ignored. Example: labour_programs is blocked when 'direct labour' or 'labour room' is present so construction-method / maternity uses do not misclassify.",
+    "disambiguation": "category_exclusions: if any exclusion phrase for a category appears in the description, keyword hits for that category are ignored. Example: labour_programs is blocked when 'direct labour' or 'labour room' is present so construction-method / maternity uses do not misclassify. Location tails after along/to-link/linking are stripped before keyword matching so destination nouns do not steal the category. Action-head patterns (housing units, access road, vehicle purchase, campus road, communications campaigns) win over incidental nouns.",
     "unknown_path": "If no keyword matches, the item is unclassified. Inflated Amount and Mandate Mismatch are skipped for unclassified items. The unclassified count is reported after each run."
   },
   "phrase_overrides": [
@@ -46,9 +46,141 @@
     {
       "phrase": "by direct labor",
       "category": null
+    },
+    {
+      "phrase": "housing units",
+      "category": "housing"
+    },
+    {
+      "phrase": "housing unit",
+      "category": "housing"
+    },
+    {
+      "phrase": "road network within the campus",
+      "category": "tertiary_education"
+    },
+    {
+      "phrase": "road network within campus",
+      "category": "tertiary_education"
+    },
+    {
+      "phrase": "access road and culvert",
+      "category": "roads"
+    },
+    {
+      "phrase": "higher institutions",
+      "category": "tertiary_education"
+    },
+    {
+      "phrase": "toyota camry",
+      "category": "recurrent_admin"
+    },
+    {
+      "phrase": "toyota hilux",
+      "category": "recurrent_admin"
+    },
+    {
+      "phrase": "toyota corolla",
+      "category": "recurrent_admin"
+    },
+    {
+      "phrase": "surveillance boats",
+      "category": "water_transport"
+    },
+    {
+      "phrase": "surveillance boat",
+      "category": "water_transport"
+    },
+    {
+      "phrase": "ambulance boats",
+      "category": "water_transport"
+    },
+    {
+      "phrase": "ambulance boat",
+      "category": "water_transport"
+    },
+    {
+      "phrase": "ambulance/ survellance boats",
+      "category": "water_transport"
+    },
+    {
+      "phrase": "ambulance/ surveillance boats",
+      "category": "water_transport"
+    },
+    {
+      "phrase": "dietary habits",
+      "category": "broadcasting"
+    },
+    {
+      "phrase": "healthy lifestyles",
+      "category": "broadcasting"
+    },
+    {
+      "phrase": "social marketing",
+      "category": "broadcasting"
+    },
+    {
+      "phrase": "sbcc",
+      "category": "broadcasting"
     }
   ],
   "category_exclusions": {
+    "medical_equipment": [
+      "boat",
+      "boats",
+      "life jacket",
+      "life jackets"
+    ],
+    "health_facilities": [
+      "dietary habits",
+      "healthy lifestyles",
+      "social marketing",
+      "sbcc"
+    ],
+    "primary_schools": [
+      "college of",
+      "school of health",
+      "university",
+      "polytechnic",
+      "college of midwifery",
+      "college of agriculture",
+      "school of nursing",
+      "within the campus",
+      "within campus"
+    ],
+    "roads": [
+      "within the campus",
+      "within campus",
+      "housing units",
+      "housing unit"
+    ],
+    "urban_infrastructure": [
+      " road",
+      " roads",
+      "road,",
+      "road.",
+      "road/",
+      "roads,",
+      "roads.",
+      "roads ",
+      "dualization",
+      "dualisation",
+      "dual carriageway",
+      "carriageway",
+      "expressway",
+      "highway",
+      "feeder road",
+      "access road",
+      "road construction",
+      "road rehabilitation",
+      "road reconstruction",
+      "road network",
+      "rural road",
+      "township road",
+      "asphalt road",
+      "of road",
+      "length of road"
+    ],
     "labour_programs": [
       "direct labour",
       "direct labor",
@@ -108,6 +240,11 @@
       "road construction",
       "road dualisation",
       "road dualization",
+      "dualisation of road",
+      "dualization of road",
+      "dualization",
+      "dualisation",
+      "length of road",
       "asphalt overlay",
       "pavement of road",
       "construction of road",
@@ -183,9 +320,15 @@
     "water_transport": [
       "ferry",
       "waterway",
-      "inland water"
+      "inland water",
+      "surveillance boat",
+      "ambulance boat",
+      "patrol boat",
+      "life jackets"
     ],
     "housing": [
+      "housing units",
+      "housing unit",
       "housing estate",
       "residential housing",
       "staff quarters",
@@ -409,12 +552,20 @@
       "university",
       "polytechnic",
       "college of education",
+      "college of midwifery",
+      "college of agriculture",
+      "school of health technology",
+      "school of health",
       "nursing school",
+      "higher institutions",
       "tertiary",
       "undergraduate",
       "graduate degree",
       "scholarship",
-      "hostel"
+      "hostel",
+      "lecture hall",
+      "within the campus",
+      "within campus"
     ],
     "vocational_training": [
       "vocational training",

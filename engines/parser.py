@@ -1036,13 +1036,13 @@ def _pdftotext(contents: bytes, timeout: int = 120) -> Optional[str]:
             tmp.write(contents)
             tmp_path = tmp.name
         result = subprocess.run(
-            [binary, '-layout', tmp_path, '-'],
+            [binary, '-layout', '-enc', 'UTF-8', tmp_path, '-'],
             capture_output=True, timeout=timeout,
         )
         os.unlink(tmp_path)
         if result.returncode == 0:
-            return result.stdout.decode('utf-8', errors='replace')
-        print(f"[parser] pdftotext failed: {result.stderr.decode()}")
+            return _decode_pdf_text(result.stdout)
+        print(f"[parser] pdftotext failed: {result.stderr.decode(errors='replace')}")
         return None
     except subprocess.TimeoutExpired:
         print(f"[parser] pdftotext timed out after {timeout}s")
@@ -1054,6 +1054,58 @@ def _pdftotext(contents: bytes, timeout: int = 120) -> Optional[str]:
     except Exception as e:
         print(f"[parser] pdftotext error: {e}")
         return None
+
+
+# Common UTF-8↔CP1252 mojibake sequences seen in Nigerian budget PDFs
+_MOJIBAKE_MAP = (
+    ('Ã¢â‚¬â„¢', "'"),
+    ('Ã¢â¬â¢', "'"),
+    ('Ã¢â‚¬Å“', '"'),
+    ('Ã¢â‚¬Â', '"'),
+    ('Ã¢â‚¬Å"', '"'),
+    ('Ã¢â‚¬Ëœ', "'"),
+    ('Ã¢â‚¬â€œ', '-'),
+    ('Ã¢â‚¬â€”', '-'),
+    ('Ã¢â‚¬Â¦', '...'),
+    ('Ã¢â‚¬Â', ''),
+    ('Ã¢â‚¬', ''),
+    ('ÃÂÂ', ''),
+    ('ÃâÃÂ', ''),
+    ('ÃÂ', ''),
+    ('Â ', ' '),
+    ('Â', ''),
+)
+
+
+def _decode_pdf_text(raw: bytes) -> str:
+    """Decode pdftotext bytes and repair common mojibake in descriptions."""
+    text = None
+    for enc in ('utf-8', 'cp1252', 'latin-1'):
+        try:
+            text = raw.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if text is None:
+        text = raw.decode('utf-8', errors='replace')
+
+    # Double-encoded UTF-8 fix: latin1→utf8 round-trip when mojibake markers present
+    if 'Ã' in text or 'Â' in text:
+        try:
+            repaired = text.encode('latin-1', errors='ignore').decode('utf-8', errors='ignore')
+            if repaired.count('Ã') < text.count('Ã'):
+                text = repaired
+        except Exception:
+            pass
+
+    for bad, good in _MOJIBAKE_MAP:
+        if bad in text:
+            text = text.replace(bad, good)
+
+    # Strip leftover double-encoding crumbs like ÃÂ without eating letters
+    text = text.replace('ÃÂ', '').replace('Ãâ', '')
+    text = re.sub(r'Ã{1,2}', '', text)
+    return text
 
 
 def _finalize_df(rows: list) -> pd.DataFrame:

@@ -1,0 +1,211 @@
+{
+  "total_items": 17873,
+  "flagged_items": 3240,
+  "flag_rate": 0.181279,
+  "high_risk": 606,
+  "medium_risk": 2529,
+  "low_risk": 105,
+  "mandate_high": 155,
+  "mandate_medium": 721,
+  "flag_counts": {
+    "INFLATED_AMOUNT": 100,
+    "MISSING_LOCATION": 865,
+    "MANDATE_MISMATCH": 876,
+    "VAGUE_LOCATION": 825,
+    "DUPLICATE_CLUSTER": 528,
+    "BUDGET_SPLITTING": 549,
+    "CONTEXT_MISMATCH": 362,
+    "GHOST_PROJECT": 21,
+    "COMPOSITE_DUPLICATE": 0,
+    "OVERHEAD_DOMINANCE": 0
+  },
+  "top10": [
+    {
+      "rank": 1,
+      "score": 100,
+      "mda": "FEDERAL MINISTRY OF EDUCATION - HQTRS",
+      "description": "REHABILITATION OF CLASSROOMS AND HOSTELS IN FUCS",
+      "amount": 28000000000.0,
+      "flags": [
+        "INFLATED_AMOUNT",
+        "MISSING_LOCATION",
+        "MANDATE_MISMATCH"
+      ]
+    },
+    {
+      "rank": 2,
+      "score": 100,
+      "mda": "FEDERAL MINISTRY OF EDUCATION - HQTRS",
+      "description": "PROVISION OF SECURITY INFRASTRUCTURE IN 118 UNITY COLLEGES SOLAR ELECTRICTY",
+      "amount": 14000000000.0,
+      "flags": [
+        "INFLATED_AMOUNT",
+        "MISSING_LOCATION",
+        "MANDATE_MISMATCH"
+      ]
+    },
+    {
+      "rank": 3,
+      "score": 100,
+      "mda": "FEDERAL MINISTRY OF EDUCATION - HQTRS",
+      "description": "PROVISION OF SECURITY INFRASTRUCTURE IN 118 UNITY COLLEGES : PERIMETER FENCING,",
+      "amount": 14000000000.0,
+      "flags": [
+        "INFLATED_AMOUNT",
+        "MISSING_LOCATION",
+        "MANDATE_MISMATCH"
+      ]
+    },
+    {
+      "rank": 4,
+      "score": 97,
+      "mda": "FEDERAL CO-OPERATIVE COLLEGE- OJI RIVER",
+      "description": "PROVISION OF ACCESS ROADS AND EROSION CONTROL IN OKPORO, OHOBA, EZIAMA ABAJAH, UZII AND SOME SELECTED STATES IN NIGERIA",
+      "amount": 6500000000.0,
+      "flags": [
+        "INFLATED_AMOUNT",
+        "MISSING_LOCATION",
+        "VAGUE_LOCATION"
+      ]
+    },
+    {
+      "rank": 5,
+      "score": 97,
+      "mda": "FEDERAL MINISTRY OF WORKS",
+      "description": "CONSTRUCTION OF ILARA - ISELU SECTION I ROAD PHASE III",
+      "amount": 6300000000.0,
+      "flags": [
+        "MISSING_LOCATION",
+        "VAGUE_LOCATION",
+        "DUPLICATE_CLUSTER"
+      ]
+    },
+    {
+      "rank": 6,
+      "score": 97,
+      "mda": "FEDERAL MINISTRY OF WORKS",
+      "description": "CONSTRUCTION OF ILARA - ISELU SECTION I ROAD PHASE II",
+      "amount": 6300000000.0,
+      "flags": [
+        "MISSING_LOCATION",
+        "VAGUE_LOCATION",
+        "DUPLICATE_CLUSTER"
+      ]
+    },
+    {
+      "rank": 7,
+      "score": 96,
+      "mda": "NIGERIAN ARMY",
+      "description": "PROCUREMENT OF UTILITY VEHICLES (TCVS AND WATER TANKERS INCLUSIVE)",
+      "amount": 4957466725.0,
+      "flags": [
+        "INFLATED_AMOUNT",
+        "MISSING_LOCATION"
+      ]
+    },
+    {
+      "rank": 8,
+      "score": 95,
+      "mda": "NATIONAL CEREALS RESEARCH INSTITUTE- BADEGGI",
+      "description": "PROVISION/SUPPLY OF GRAINS TO RURAL FARMERS IN SELECTED COMMUNITIES OF SOUTH SOUTH STATES(LOT 1-10)",
+      "amount": 4130000000.0,
+      "flags": [
+        "INFLATED_AMOUNT",
+        "MISSING_LOCATION",
+        "VAGUE_LOCATION"
+      ]
+    },
+    {
+      "rank": 9,
+      "score": 95,
+      "mda": "NIGERIAN BUILDING AND ROAD RESEARCH INSTITUTE - LAGOS",
+      "description": "CONSTRUCTION/REHABILITATION OF RURAL AND TOWNSHIP ROADS IN SELECTED LOCATIONS IN THE SOUTHEAST REGION (MULTIPLE LOTS)",
+      "amount": 3500000000.0,
+      "flags": [
+        "MISSING_LOCATION",
+        "VAGUE_LOCATION",
+        "DUPLICATE_CLUSTER",
+        "BUDGET_SPLITTING"
+      ]
+    },
+    {
+      "rank": 10,
+      "score": 95,
+      "mda": "NIGERIAN BUILDING AND ROAD RESEARCH INSTITUTE - LAGOS",
+      "description": "CONSTRUCTION/REHABILITATION OF RURAL AND TOWNSHIP ROADS IN SELECTED LOCATIONS IN THE SOUTH-WEST REGION (MULTIPLE LOTS)",
+      "amount": 3500000000.0,
+      "flags": [
+        "MISSING_LOCATION",
+        "VAGUE_LOCATION",
+        "DUPLICATE_CLUSTER",
+        "BUDGET_SPLITTING"
+      ]
+    }
+  ],
+  "regression_note": "Locked 2026-07-28 after road-classification fix + federal mandate scope widen + mojibake repair",
+  "scope_widenings": [
+    {
+      "mda": "Federal Road Maintenance Agency",
+      "added": [
+        "roads",
+        "urban_infrastructure"
+      ]
+    },
+    {
+      "mda": "Federal Ministry of Works",
+      "added": [
+        "renewable_energy"
+      ]
+    },
+    {
+      "mda": "Federal Ministry of Housing and Urban Development",
+      "added": [
+        "roads",
+        "water_supply",
+        "renewable_energy"
+      ]
+    },
+    {
+      "mda": "Federal Ministry of Environment",
+      "added": [
+        "urban_infrastructure",
+        "renewable_energy"
+      ]
+    },
+    {
+      "mda": "Federal Ministry of Power",
+      "added": [
+        "urban_infrastructure"
+      ]
+    },
+    {
+      "mda": "Federal Ministry of Health and Social Welfare",
+      "added": [
+        "research_development",
+        "vocational_training",
+        "ict_infrastructure"
+      ]
+    },
+    {
+      "mda": "Federal Ministry of Agriculture and Food Security",
+      "added": [
+        "renewable_energy"
+      ]
+    },
+    {
+      "mda": "Federal Ministry of Water Resources and Sanitation",
+      "added": [
+        "urban_infrastructure",
+        "renewable_energy"
+      ]
+    }
+  ],
+  "compared_to_regressed": {
+    "flagged_before_fix": 3898,
+    "flagged_after_fix": 3240,
+    "inflated_before": 118,
+    "inflated_after": 100,
+    "mandate_medium_before": 1461,
+    "mandate_medium_after": 721
+  }
+}

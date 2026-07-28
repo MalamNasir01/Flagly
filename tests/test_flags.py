@@ -165,6 +165,10 @@ class VagueLocationTests(unittest.TestCase):
 
 
 class MandateMismatchTests(unittest.TestCase):
+    def setUp(self):
+        import engines.flags as flags
+        flags.ACTIVE_MDA_MANDATES = flags.MDA_MANDATES
+
     def test_ferma_solar_street_lights(self):
         row = _row(
             description='Supply & Installation of Solar Street Lights',
@@ -341,6 +345,85 @@ class DisambiguationTests(unittest.TestCase):
         )
         self.assertEqual(cat, 'renewable_energy')
         self.assertIn('solar', kw)
+
+    def test_access_road_to_school_is_roads_not_primary(self):
+        from engines.classifier import classify_project, reload_classifier_data
+        reload_classifier_data()
+        self.assertEqual(
+            classify_project(
+                'Construction of 3mx3m Four cells Reinforced Concrete Box Culvert '
+                'on River Kontagora and 350m Access Road to link Ubanana Primary School - Rigasa'
+            ),
+            'roads',
+        )
+
+    def test_housing_units_along_road_is_housing(self):
+        from engines.classifier import classify_project, reload_classifier_data
+        reload_classifier_data()
+        self.assertEqual(
+            classify_project('Provision of 1,000 Housing Units Along Paiko-Suleja Road'),
+            'housing',
+        )
+
+    def test_vehicle_purchase_not_tertiary(self):
+        from engines.classifier import classify_project, reload_classifier_data
+        reload_classifier_data()
+        self.assertEqual(
+            classify_project(
+                'purchase of 1no. Toyota Camry. 1no.Toyota Hilux and 2no. Toyota '
+                'corrolla saloon EDUCATION'
+            ),
+            'recurrent_admin',
+        )
+
+    def test_ambulance_boats_not_medical_equipment(self):
+        from engines.classifier import classify_project, reload_classifier_data
+        reload_classifier_data()
+        self.assertEqual(
+            classify_project(
+                'Purchase of 3no Ambulance/ Survellance Boats and Life Jackets'
+            ),
+            'water_transport',
+        )
+
+    def test_dietary_sbcc_is_broadcasting(self):
+        from engines.classifier import classify_project, reload_classifier_data
+        reload_classifier_data()
+        self.assertEqual(
+            classify_project(
+                'Promote good dietary habits and healthy lifestyles for all age groups '
+                'through appropriate social marketing and communication'
+            ),
+            'broadcasting',
+        )
+
+    def test_campus_road_network_is_tertiary(self):
+        from engines.classifier import classify_project, reload_classifier_data
+        reload_classifier_data()
+        self.assertEqual(
+            classify_project('EDUCATION Completion of Road Network within the Campus & Ext. of ICT Rd'),
+            'tertiary_education',
+        )
+
+    def test_federal_amasiru_road_not_urban(self):
+        from engines.classifier import classify_project, reload_classifier_data
+        reload_classifier_data()
+        self.assertEqual(
+            classify_project(
+                'CONSTRUCTION/REHABILITATION OF AMASIRU-OKPOSI-UBURU-ISHIAGU ROAD'
+            ),
+            'roads',
+        )
+
+    def test_federal_dualization_is_roads(self):
+        from engines.classifier import classify_project, reload_classifier_data
+        reload_classifier_data()
+        self.assertEqual(
+            classify_project(
+                'BENIN-AKURE DUALIZATION OF ROAD PHASE 1 LENGTH OF ROAD: 150.7KM'
+            ),
+            'roads',
+        )
 
 
 class AggregateInflationTests(unittest.TestCase):

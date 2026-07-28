@@ -920,6 +920,64 @@ def _match_excluded_category(category: Optional[str], excluded: list) -> Optiona
     return None
 
 
+_INSTITUTION_MDA_RE = re.compile(
+    r'\b('
+    r'university|polytechnic|college|midwifery|'
+    r'school\s+of\s+(?:health|nursing|midwifery)|'
+    r'specialist\s+hospital|teaching\s+hospital|general\s+hospital|'
+    r'ministry\s+of\s+health|primary\s+health'
+    r')\b',
+    re.I,
+)
+_OWN_FACILITY_DESC_RE = re.compile(
+    r'\b('
+    r'classroom|hostel|lecture\s+hall|laboratory|\blabs?\b|library|'
+    r'campus|within\s+(?:the\s+)?campus|ict\s+(?:centre|center|rd|road)|'
+    r'doctor.?s?\s+quarter|staff\s+quarter|residential\s+building|'
+    r'renovation|construction\s+of'
+    r')\b',
+    re.I,
+)
+_CAMPUS_ROAD_RE = re.compile(
+    r'\b(campus|within\s+(?:the\s+)?campus|lecture\s+hall|ict\s+(?:centre|center|rd|road)|'
+    r'access\s+road.{0,40}(?:campus|lecture|ict)|'
+    r'(?:hospital|clinic|phc|ibbth).{0,40}(?:road|fence|gate\s+house|drainage)|'
+    r'(?:fence|gate\s+house|roads?\s+and\s+drainages?).{0,60}(?:hospital|clinic|phc|ibbth)\b'
+    r')\b',
+    re.I,
+)
+
+
+def _institution_own_facility(
+    ministry: str,
+    category: Optional[str],
+    description: str,
+) -> bool:
+    """True when an education/health-training MDA is building its own campus facilities.
+
+    Classifiers often tag campus classrooms as primary_schools or campus roads as roads;
+    those are in-scope for the institution, not excluded-sector spending.
+    """
+    if not category or not ministry or not description:
+        return False
+    if not _INSTITUTION_MDA_RE.search(ministry):
+        return False
+    cat = category.lower()
+    if cat in ('primary_schools', 'secondary_schools', 'tertiary_education',
+               'educational_materials', 'vocational_training'):
+        return bool(_OWN_FACILITY_DESC_RE.search(description))
+    if cat in ('roads', 'road_maintenance', 'urban_infrastructure'):
+        return bool(_CAMPUS_ROAD_RE.search(description))
+    if cat == 'housing':
+        # Doctor/staff quarters on a hospital or campus site
+        return bool(re.search(
+            r'\b(doctor|staff|quarter|hostel|residential)\b',
+            description,
+            re.I,
+        ))
+    return False
+
+
 def flag_mandate_mismatch(row: Dict) -> Optional[Dict]:
     """HIGH if category in MDA excluded; MEDIUM if neither scope nor excluded; skip if unclassified."""
     from engines.classifier import classify_with_match
@@ -940,6 +998,10 @@ def flag_mandate_mismatch(row: Dict) -> Optional[Dict]:
 
     # Unknown category path: do not fire mismatch
     if not category:
+        return None
+
+    # Institution renovating/building its own campus facilities is in-scope
+    if _institution_own_facility(ministry, category, description):
         return None
 
     meta = _lookup_mda_scope(ministry, row.get('mda_code'))

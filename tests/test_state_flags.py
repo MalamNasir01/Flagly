@@ -38,6 +38,10 @@ def _row(**kwargs):
 
 
 class StateMandateTests(unittest.TestCase):
+    def tearDown(self):
+        import engines.flags as flags
+        flags.ACTIVE_MDA_MANDATES = flags.MDA_MANDATES
+
     def test_state_mandates_loaded(self):
         self.assertGreater(len(STATE_MDA_MANDATES), 20)
         self.assertIn("MINISTRY OF WORKS", STATE_MDA_MANDATES)
@@ -82,6 +86,54 @@ class StateMandateTests(unittest.TestCase):
         self.assertIsNotNone(flag)
         self.assertEqual(flag["severity"], "HIGH")
         self.assertEqual(flag["evidence"]["mismatch_kind"], "excluded")
+
+    def test_university_campus_road_not_mandate_high(self):
+        import engines.flags as flags
+        from engines.classifier import classify_with_match, reload_classifier_data
+
+        reload_classifier_data()
+        flags.ACTIVE_MDA_MANDATES = STATE_MDA_MANDATES
+        desc = "EDUCATION Completion of Road Network within the Campus & Ext. of ICT Rd"
+        cat, kw = classify_with_match(desc)
+        row = _row(
+            description=desc,
+            mda_name="IBB University",
+            mda_code="056600600100",
+            ministry="IBB University",
+            _project_category=cat,
+            _category_keyword=kw,
+        )
+        self.assertIsNone(flag_mandate_mismatch(row))
+
+    def test_health_tech_classroom_renovation_not_mandate_high(self):
+        import engines.flags as flags
+
+        flags.ACTIVE_MDA_MANDATES = STATE_MDA_MANDATES
+        row = _row(
+            description="EDUCATION Renovation of 6no Classroom",
+            mda_name="School of Health Technology Minna",
+            mda_code="056910600100",
+            ministry="School of Health Technology Minna",
+            _project_category="primary_schools",
+            _category_keyword="classroom",
+        )
+        self.assertIsNone(flag_mandate_mismatch(row))
+
+    def test_agriculture_rural_road_still_mandate_high(self):
+        import engines.flags as flags
+
+        flags.ACTIVE_MDA_MANDATES = STATE_MDA_MANDATES
+        row = _row(
+            description="Construction of 10km Rural Roads and Markets)World Bank) Agwara",
+            mda_name="Ministry of Agriculture",
+            mda_code="021500100100",
+            ministry="Ministry of Agriculture",
+            _project_category="roads",
+            _category_keyword="rural road",
+        )
+        flag = flag_mandate_mismatch(row)
+        self.assertIsNotNone(flag)
+        self.assertEqual(flag["severity"], "HIGH")
 
 
 class StateInflationTests(unittest.TestCase):
